@@ -1,0 +1,30 @@
+# Visual Studio
+.vs/
+*.sln.ide/
+*.VC.db
+*.VC.db-shm
+*.VC.db-wal
+
+# Build outputs
+x64/
+Debug/
+Release/
+Win32/
+*.exe
+*.pdb
+*.ilk
+*.obj
+*.lib
+*.tlog/
+*.log
+*.recipe
+*.idb
+*.ipch
+*.lastbuildstate
+*.unsuccessfulbuild
+*.FileListAbsolute.txt
+*.Build.CppClean.log
+
+# VS user files
+*.vcxproj.user
+*.suo
