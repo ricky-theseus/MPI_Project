@@ -15,7 +15,8 @@ int main(int argc, char** argv) {
 
     if (world_size != N * N) {
         if (world_rank == 0) {
-            std::cerr << "错误：需要 " << N * N << " 个进程，当前 " << world_size << " 个\n";
+            std::cerr << "Error: requires " << N * N << " processes, got " << world_size << "\n";
+            std::cerr << "Usage: mpiexec -n " << N * N << " homework3.exe\n";
         }
         MPI_Finalize();
         return 1;
@@ -55,7 +56,7 @@ int main(int argc, char** argv) {
     MPI_Gather(&local_result, 1, MPI_INT, results.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     if (world_rank == 0) {
-        std::cout << "矩阵 A:\n";
+        std::cout << "Matrix A:\n";
         for (int i = 0; i < N; ++i) {
             for (int j = 0; j < N; ++j) {
                 std::cout << std::setw(4) << A[i * N + j];
@@ -63,7 +64,7 @@ int main(int argc, char** argv) {
             std::cout << '\n';
         }
 
-        std::cout << "\n矩阵 B:\n";
+        std::cout << "\nMatrix B:\n";
         for (int i = 0; i < N; ++i) {
             for (int j = 0; j < N; ++j) {
                 std::cout << std::setw(4) << B[i * N + j];
