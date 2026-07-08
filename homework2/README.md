@@ -52,13 +52,30 @@ MSBuild homework2.vcxproj /p:Configuration=Debug /p:Platform=x64
 mpiexec -n 4 homework2\x64\Debug\homework2.exe
 ```
 
-## 示例输出
+## 示例运行
+
+```bash
+mpiexec -n 4 homework2\x64\Debug\homework2.exe
+```
+
+运行时依次输入：
 
 ```
 Enter m (array length): 8
-Enter k (binary split count): 3
+Enter k (binary split count): 2
 Enter 8 integers: 3 1 4 1 5 9 2 6
-m=8, k=3, needed processes=8, actual=4
+```
+
+另一种运行方式（用管道一次传入）：
+
+```bash
+"8 2 3 1 4 1 5 9 2 6" | mpiexec -n 4 homework2\x64\Debug\homework2.exe
+```
+
+### 示例输出（k=2, 4 进程）
+
+```
+m=8, k=2, needed processes=4, actual=4
 Rank 0 got chunk: 3 1
 Rank 0 sorted: 1 3
 Rank 0 merged from rank 1, now has: 1 1 3 4
@@ -67,3 +84,12 @@ Rank 0 merged from rank 2, now has: 1 1 2 3 4 5 6 9
 Final sorted array: 1 1 2 3 4 5 6 9
 PASS: matches std::sort
 ```
+
+### 进程数对应关系
+
+| m | k | 2^k | 需要进程数 | 实际启动 | 每进程分几块 |
+|---|---|---|---|---|---|
+| 8 | 1 | 2 | 2 | 2 | 4 个 |
+| 8 | 2 | 4 | 4 | 4 | 2 个 |
+| 8 | 3 | 8 | 8 | 建议 `-n 8` | 1 个 |
+| 8 | 4 | 16 | 8（上限 m） | 8 | 1 个 |
