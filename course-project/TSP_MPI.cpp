@@ -192,13 +192,25 @@ int main(int argc, char **argv)
                 colony[N_COLONY + i][j] = temp[j];
         }
 
-        /* gather children to root */
-        MPI_Gatherv(&colony[N_COLONY + start][0], local_count * CITY, MPI_INT,
-                    &colony[N_COLONY][0], recv_counts, displs, MPI_INT,
-                    0, MPI_COMM_WORLD);
-        MPI_Gatherv(&dis_p[N_COLONY + start], local_count, MPI_DOUBLE,
-                    &dis_p[N_COLONY], recv_counts_d, displs_d, MPI_DOUBLE,
-                    0, MPI_COMM_WORLD);
+        /* gather children to root (MPI_IN_PLACE to avoid aliasing on root) */
+        if (rank == 0)
+        {
+            MPI_Gatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+                        &colony[N_COLONY][0], recv_counts, displs, MPI_INT,
+                        0, MPI_COMM_WORLD);
+            MPI_Gatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+                        &dis_p[N_COLONY], recv_counts_d, displs_d, MPI_DOUBLE,
+                        0, MPI_COMM_WORLD);
+        }
+        else
+        {
+            MPI_Gatherv(&colony[N_COLONY + start][0], local_count * CITY, MPI_INT,
+                        NULL, NULL, NULL, MPI_INT,
+                        0, MPI_COMM_WORLD);
+            MPI_Gatherv(&dis_p[N_COLONY + start], local_count, MPI_DOUBLE,
+                        NULL, NULL, NULL, MPI_DOUBLE,
+                        0, MPI_COMM_WORLD);
+        }
 
         /* root: select + print */
         if (rank == 0)
