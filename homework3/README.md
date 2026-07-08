@@ -1,41 +1,30 @@
 # MPI 矩阵乘法 — homework3
 
+## 题目
+
+利用 MPI 实现 3×3 矩阵乘法 `C = A × B`，每个进程计算结果矩阵中的一个元素。
+
 ## 解题思路
 
-**问题**：计算两个 3×3 矩阵 A × B 的乘积，使用 MPI 并行加速。
+### 算法设计
 
-**并行策略**：
+采用 9 个进程（3×3 网格），进程 rank `i * N + j` 负责计算 `C[i][j]`：
 
-1. **任务分解**：结果矩阵 C 有 3×3 = 9 个元素，每个元素 C[i][j] 的计算互相独立，因此启动 9 个 MPI 进程，每个进程负责计算一个元素。
+1. **初始化**：rank 0 硬编码矩阵 A 和 B
+2. **广播**：`MPI_Bcast` 将 A、B 发送给所有进程
+3. **局部计算**：每个进程计算 `C[i][j] = Σ A[i][k] * B[k][j]`，其中 `i = rank / N`，`j = rank % N`
+4. **收集结果**：`MPI_Gather` 将各进程的结果汇集到 rank 0 并输出
 
-2. **数据分发**：
-   - Rank 0 持有完整的 A、B 矩阵
-   - 通过两次 `MPI_Bcast` 将 A、B 广播给所有 9 个进程
-   - 每个进程收到完整矩阵后，根据自身 rank 确定负责的元素位置：
-     - 行号 `i = rank / 3`
-     - 列号 `j = rank % 3`
-
-3. **本地计算**：每个进程独立计算 `C[i][j] = Σ(k=0..2) A[i][k] × B[k][j]`
-
-4. **结果归集**：通过 `MPI_Gather` 将所有 9 个计算结果收集回 rank 0，按顺序拼成完整的 C 矩阵
-
-5. **输出**：Rank 0 打印 A、B、C 三个矩阵
-
-**图示**：
+### 矩阵
 
 ```
-Rank 0: C[0][0]  Rank 1: C[0][1]  Rank 2: C[0][2]
-Rank 3: C[1][0]  Rank 4: C[1][1]  Rank 5: C[1][2]
-Rank 6: C[2][0]  Rank 7: C[2][1]  Rank 8: C[2][2]
-
-广播: rank 0 ──MPI_Bcast──→ rank 0~8
-计算: rank r → C[r/3][r%3]
-收集: rank 0~8 ──MPI_Gather──→ rank 0
+    A            B            C
+1  2  3      9  8  7     30  24  18
+4  5  6  ×   6  5  4  =  84  69  54
+7  8  9      3  2  1    138 114  90
 ```
 
 ## 编译
-
-用 MSBuild（或 Visual Studio 打开 `.vcxproj` 后生成）：
 
 ```bash
 MSBuild homework3.vcxproj /p:Configuration=Debug /p:Platform=x64
@@ -43,20 +32,9 @@ MSBuild homework3.vcxproj /p:Configuration=Debug /p:Platform=x64
 
 ## 运行
 
-从项目根目录运行：
-
 ```bash
 mpiexec -n 9 homework3\x64\Debug\homework3.exe
 ```
-
-或进入输出目录：
-
-```bash
-cd homework3\x64\Debug
-mpiexec -n 9 homework3.exe
-```
-
-**注意**：`-n 9` 不可省略，必须恰好 9 个进程，否则程序会报错退出。
 
 ## 示例输出
 
