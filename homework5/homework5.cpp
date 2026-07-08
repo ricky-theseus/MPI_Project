@@ -40,6 +40,8 @@ int main(int argc, char** argv) {
 
     int sendval = rank + 1;
 
+    std::cout << "Rank " << rank << " contributes: " << sendval << "\n";
+
     std::vector<int> mybuf;
     mybuf.resize(size);
 
@@ -61,11 +63,9 @@ int main(int argc, char** argv) {
         }
     }
 
-    std::cout << "Rank " << rank << ": my    =";
+    std::cout << "Rank " << rank << " has all:";
     for (int v : mybuf) std::cout << ' ' << v;
-    std::cout << "\nRank " << rank << ": ref   =";
-    for (int v : expected) std::cout << ' ' << v;
-    std::cout << "\nRank " << rank << ": " << (ok ? "PASS" : "FAIL") << "\n\n";
+    std::cout << "\nRank " << rank << ": " << (ok ? "PASS" : "FAIL") << "\n";
 
     MPI_Finalize();
     return 0;
