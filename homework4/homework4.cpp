@@ -37,6 +37,8 @@ int main(int argc, char** argv) {
     constexpr int N = 4;
     int sendbuf = rank + 1;
 
+    std::cout << "Rank " << rank << " sendbuf = " << sendbuf << "\n";
+
     std::vector<int> recvbuf;
     if (rank == 0) {
         recvbuf.resize(size);
@@ -47,11 +49,10 @@ int main(int argc, char** argv) {
                   0, MPI_COMM_WORLD);
 
     if (rank == 0) {
-        std::cout << "my_MPI_Gather result:\n";
-        for (int v : recvbuf) {
-            std::cout << ' ' << v;
+        std::cout << "\n--- my_MPI_Gather result ---\n";
+        for (int i = 0; i < size; ++i) {
+            std::cout << "  from rank " << i << " -> recvbuf[" << i << "] = " << recvbuf[i] << "\n";
         }
-        std::cout << '\n';
 
         std::vector<int> expected;
         expected.resize(size);
@@ -66,7 +67,12 @@ int main(int argc, char** argv) {
                 break;
             }
         }
-        std::cout << (ok ? "PASS: matches MPI_Gather\n" : "FAIL: mismatch\n");
+        std::cout << "\n--- Comparison ---\n";
+        std::cout << "  my_MPI_Gather: ";
+        for (int v : recvbuf) std::cout << v << " ";
+        std::cout << "\n  MPI_Gather:    ";
+        for (int v : expected) std::cout << v << " ";
+        std::cout << "\n  => " << (ok ? "PASS: results match\n" : "FAIL: mismatch\n");
     } else {
         MPI_Gather(&sendbuf, 1, MPI_INT,
                    nullptr, 1, MPI_INT,
