@@ -25,6 +25,12 @@ Win32/
 *.FileListAbsolute.txt
 *.Build.CppClean.log
 
+# Runtime output
+tsp0.txt
+
+# Build intermediates (per-project subdirs)
+TSP_MPI/
+
 # VS user files
 *.vcxproj.user
 *.suo
