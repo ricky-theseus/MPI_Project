@@ -1,50 +1,44 @@
-# Course Project: TSP Solver (Serial Baseline)
+# 课程设计：TSP 并行计算解决方案（串行基础版）
 
-## Files
+## 文件说明
 
-| File | Description |
+| 文件 | 说明 |
 |---|---|
-| `TSP0.C` | Serial TSP solver (colony-based heuristic + inversion mutation) |
-| `pcb442.tsp` | TSPLIB benchmark — 442 PCB drilling cities |
-| `hierarchical.pdf` | Reference paper on hierarchical parallel TSP |
-| `TSP0.exe` | Precompiled binary |
+| `TSP0.C` | 串行 TSP 求解器（群体搜索 + 反转变异） |
+| `pcb442.tsp` | TSPLIB 标准测试集，442 个 PCB 钻孔城市坐标 |
+| `hierarchical.pdf` | 参考文献 |
+| `TSP0.exe` | 已编译的可执行文件 |
 
-## Problem
+## 问题描述
 
-Given n cities and pairwise distances, find the shortest Hamiltonian cycle visiting each city exactly once.
+旅行商问题（TSP）：给定 n 个城市及两两间的距离，求经过每个城市恰好一次的最短回路。
 
-Benchmark `pcb442.tsp` (from TSPLIB) contains 442 cities with integer Euclidean distances (rounded).
+测试数据 `pcb442.tsp` 来自 TSPLIB，包含 442 个城市，坐标为 PCB 钻孔位置，距离取四舍五入后的整数欧氏距离。
 
-## Algorithm
+## 算法说明
 
-`TSP0.C` implements a population-based heuristic:
+维护 `xColony` 条随机路径（排列），每轮对每条路径执行**反转变异**（翻转两城市间的一段），变异来源有概率随机或从另一条路径继承。每 `xColony` 轮执行一次父子锦标赛选择。
 
-- Maintains `xColony` random permutations (tours)
-- Each iteration applies **inversion mutation** to each tour: reverses a segment between two cities
-- Mutation source is either random (`probab1`) or borrowed from another tour's corresponding position
-- Every `xColony` iterations, parent-child tournament selection replaces worse tours
-- Stops after `maxGen` generations
+## 编译与运行
 
-## Run (instructions)
+打开 **Developer Command Prompt for VS 2022**（或执行 `VsDevCmd.bat`），然后：
 
-Open **Developer Command Prompt for VS 2022** (or load environment via `VsDevCmd.bat`), then:
-
-### 1. Compile
+### 编译
 
 ```cmd
 cd course-project
 cl /TC /O2 TSP0.C
 ```
 
-`/TC` forces C compilation (`.C` extension otherwise treated as C++).
+`/TC` 强制以 C 语言编译（`.C` 后缀默认被当作 C++）。
 
-### 2. Run
+### 运行
 
 ```cmd
 TSP0.exe
 ```
 
-Input `pcb442.tsp` is read from current directory. Output (best distance per generation) goes to stdout:
+输入文件 `pcb442.tsp` 放在当前目录。标准输出打印每代最佳距离：
 
 ```
 init success!!!
@@ -53,32 +47,23 @@ init success!!!
 2000:340177.000000
 ```
 
-Detailed log is appended to `tsp0.txt`, one line per checkpoint:
+详细日志追加到 `tsp0.txt`，每行格式：`<代数>  <耗时秒>  <距离>`
 
-```
-<GenNum>  <seconds>  <distance>
-```
+### 参数调优
 
-### Tuning
+编辑 `TSP0.C` 顶部变量：
 
-Edit these variables at the top of `TSP0.C`:
-
-| Variable | Default | Meaning |
+| 变量 | 默认值 | 含义 |
 |---|---|---|
-| `xColony` | 100 | Population size |
-| `probab1` | 0.02 | Random-mutation probability |
-| `maxGen` | 200000 | Max generations to run |
-| `NOCHANGE` | 200000 | Early-stop if no improvement |
+| `xColony` | 100 | 群体大小（路径数量） |
+| `probab1` | 0.02 | 随机变异概率 |
+| `maxGen` | 200000 | 最大迭代代数 |
+| `NOCHANGE` | 200000 | 连续无改进则提前停止 |
 
-### Known issues
+## MPI 并行化方向（后续）
 
-- `srand` at line 119 should be `srand` but is accepted by MSVC (implicit declaration only warns)
-- `%Lf` format specifier reads `long double` but `x`/`y` are `double`; works in practice on MSVC
+将 `xColony` 条路径分配到多个 MPI 进程：
 
-## MPI parallelization plan (future)
-
-Distribute `xColony` tours across processes:
-
-1. Root scatters tour batches to workers
-2. Each worker mutates + evaluates its batch independently
-3. Workers send improved tours back; root performs global selection
+1. 主进程将路径分批分发给各子进程
+2. 各进程独立执行变异 + 距离计算
+3. 子进程将改良后的路径传回主进程，主进程执行全局选择
