@@ -1,13 +1,14 @@
-# 课程设计：TSP 并行计算解决方案（串行基础版）
+# 课程设计：TSP 并行计算解决方案
 
 ## 文件说明
 
 | 文件 | 说明 |
 |---|---|
 | `TSP0.C` | 串行 TSP 求解器（群体搜索 + 反转变异） |
+| `TSP_MPI.cpp` | MPI 并行版 TSP 求解器 |
 | `pcb442.tsp` | TSPLIB 标准测试集，442 个 PCB 钻孔城市坐标 |
 | `hierarchical.pdf` | 参考文献 |
-| `TSP0.exe` | 已编译的可执行文件 |
+| `TSP0.exe` | 串行可执行文件 |
 
 ## 问题描述
 
@@ -15,30 +16,23 @@
 
 测试数据 `pcb442.tsp` 来自 TSPLIB，包含 442 个城市，坐标为 PCB 钻孔位置，距离取四舍五入后的整数欧氏距离。
 
-## 算法说明
+## 串行版（TSP0.C）
+
+### 算法
 
 维护 `xColony` 条随机路径（排列），每轮对每条路径执行**反转变异**（翻转两城市间的一段），变异来源有概率随机或从另一条路径继承。每 `xColony` 轮执行一次父子锦标赛选择。
 
-## 编译与运行
+### 编译与运行
 
 打开 **Developer Command Prompt for VS 2022**（或执行 `VsDevCmd.bat`），然后：
-
-### 编译
 
 ```cmd
 cd course-project
 cl /TC /O2 TSP0.C
-```
-
-`/TC` 强制以 C 语言编译（`.C` 后缀默认被当作 C++）。
-
-### 运行
-
-```cmd
 TSP0.exe
 ```
 
-输入文件 `pcb442.tsp` 放在当前目录。标准输出打印每代最佳距离：
+`/TC` 强制以 C 语言编译。输入文件 `pcb442.tsp` 放在当前目录。标准输出打印每代最佳距离：
 
 ```
 init success!!!
@@ -58,12 +52,40 @@ init success!!!
 | `xColony` | 100 | 群体大小（路径数量） |
 | `probab1` | 0.02 | 随机变异概率 |
 | `maxGen` | 200000 | 最大迭代代数 |
-| `NOCHANGE` | 200000 | 连续无改进则提前停止 |
 
-## MPI 并行化方向（后续）
+## MPI 并行版（TSP_MPI.cpp）
 
-将 `xColony` 条路径分配到多个 MPI 进程：
+### 并行策略
 
-1. 主进程将路径分批分发给各子进程
-2. 各进程独立执行变异 + 距离计算
-3. 子进程将改良后的路径传回主进程，主进程执行全局选择
+将 `xColony` 条路径均匀分配到所有 MPI 进程，每代流程：
+
+1. **root 广播**当前群体到所有进程（保证跨进程的变异参考正确性）
+2. **各进程独立**对其分块的路径执行反转变异 + 距离计算
+3. **gather** 子代结果回 root
+4. **root 执行**锦标赛选择，输出最佳距离
+5. 循环至 `maxGen` 代
+
+### 编译
+
+```cmd
+cd course-project
+cl /TP /O2 /I"%MSMPI_INC%" TSP_MPI.cpp /link /LIBPATH:"%MSMPI_LIB64%" msmpi.lib
+```
+
+### 运行
+
+```cmd
+mpiexec -n 4 TSP_MPI.exe
+```
+
+进程数建议整除 `xColony`（100），例如 2、4、5、10 等，使负载均衡。
+
+### 与串行版对比
+
+| 方面 | TSP0.C | TSP_MPI.cpp |
+|---|---|---|
+| 语言 | C | C++（含 MPI） |
+| 随机种子 | `srand(time(NULL))` | `srand(time(NULL) + rank)` 各进程不同 |
+| 计时 | `clock()` | `MPI_Wtime()` |
+| 输出 | stdout + tsp0.txt | 同串行 |
+| 加速方式 | 单线程 | 多进程并行评估 |
