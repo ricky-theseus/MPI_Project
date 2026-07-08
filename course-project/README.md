@@ -67,10 +67,17 @@ init success!!!
 
 ### 编译（MSBuild，与其他 homework 一致方式）
 
-打开 **Developer Command Prompt for VS 2022**，然后：
+#### CMD
 
 ```cmd
 cd course-project
+msbuild TSP_MPI.vcxproj /p:Configuration=Release /p:Platform=x64
+```
+
+#### PowerShell
+
+```powershell
+Set-Location course-project
 msbuild TSP_MPI.vcxproj /p:Configuration=Release /p:Platform=x64
 ```
 
@@ -78,8 +85,17 @@ msbuild TSP_MPI.vcxproj /p:Configuration=Release /p:Platform=x64
 
 ### 运行
 
+#### CMD
+
 ```cmd
 cd course-project\x64\Release
+mpiexec -n 4 TSP_MPI.exe
+```
+
+#### PowerShell
+
+```powershell
+Set-Location course-project\x64\Release
 mpiexec -n 4 TSP_MPI.exe
 ```
 
