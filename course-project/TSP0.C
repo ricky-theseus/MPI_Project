@@ -2,18 +2,18 @@
 #include<time.h>
 #include<stdlib.h>
 #include<stdio.h>
-#define FILE_PATH  "d:\\pcb442.tsp","r"  //Êý¾ÝÎÄ¼þÃû
+#define FILE_PATH  "pcb442.tsp","r"
 #define N_COLONY 100  // N_COLONY>=xColony
 #define CITY     442  // CITY>=xCity
-int     xColony=100;     //##//  ¸öÌåÊý
+int     xColony=100;     //##//  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 int     xCity=CITY;
-double  probab1=0.02;    //##//  ±äÒì¸ÅÂÊ
-long    NOCHANGE=200000;  //##//  ×î´óÍ£Ö¹¸Ä±ä´úÊý
-long    maxGen=200000;    //##//  Í£»ú´úÊý
+double  probab1=0.02;    //##//  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+long    NOCHANGE=200000;  //##//  ï¿½ï¿½ï¿½Í£Ö¹ï¿½Ä±ï¿½ï¿½ï¿½ï¿½
+long    maxGen=200000;    //##//  Í£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 int     colony[N_COLONY*2][CITY],colony2[N_COLONY][CITY]; //zhongqun 
 double  cityXY[CITY][2];
 double  city_dis[CITY][CITY];
-double  dis_p[N_COLONY*2]; //ÊÊÓ¦Öµ
+double  dis_p[N_COLONY*2]; //ï¿½ï¿½Ó¦Öµ
 double  sumbest,sumTemp;
 int     temp[CITY],ibest;
 clock_t timeStart,timeNow,timeTemp;
@@ -43,7 +43,7 @@ int main()
     pos_C=rand()%xCity;
    	for(;;)
     { 
-      if((rand()/32768.0)<probab1)     //ÄÚ±äÒìËã×Ó
+      if((rand()/32768.0)<probab1)     //ï¿½Ú±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
       { 
 	  	do 
 		  pos_C1=rand()%xCity;
@@ -77,7 +77,7 @@ int main()
   		for(j=0;j<xCity;j++)
 		  colony[N_COLONY+i][j]=temp[j];
     i++;
-    if(i>=xColony)//´Ë´¦ÊÇ±¨µÀ+¼Ó´úÊý 
+    if(i>=xColony)//ï¿½Ë´ï¿½ï¿½Ç±ï¿½ï¿½ï¿½+ï¿½Ó´ï¿½ï¿½ï¿½ 
 	{ 	
 		select1();
 		Ni++; GenNum++;i=0;
@@ -200,7 +200,7 @@ int position(int *tmp,int C)
 void printBest(long GenNum)
 { 
   int i;
-  if((fpme=fopen("e:\\tsp0.txt","a"))==NULL)exit(0);
+  if((fpme=fopen("tsp0.txt","a"))==NULL)exit(0);
     //fprintf(fpme,"\n   CITY      %d\t\tN_COLONY  %d",CITY,N_COLONY);
     //fprintf(fpme,"\ntime     %4.2f",(double)(timeNow-timeStart)/CLOCKS_PER_SEC);
     //fprintf(fpme,"\n   distance  %f",sumbest);
