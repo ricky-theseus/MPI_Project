@@ -17,6 +17,15 @@ std::vector<int> merge_sorted(const std::vector<int>& a, const std::vector<int>&
     return merged;
 }
 
+int calc_processes(int m, int k) {
+    int n = 1;
+    for (int i = 0; i < k; ++i) {
+        if (n >= m) break;
+        n *= 2;
+    }
+    return std::min(n, m);
+}
+
 }
 
 int main(int argc, char** argv) {
@@ -26,19 +35,38 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    std::vector<int> data = {
-        3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 8, 0
-    };
-    int m = static_cast<int>(data.size());
+    int m = 0, k = 0;
+    std::vector<int> data;
 
-    if (size > m) {
-        if (rank == 0)
-            std::cerr << "Error: need at most " << m << " processes, got " << size << "\n";
+    if (rank == 0) {
+        std::cout << "Enter m (array length): ";
+        std::cin >> m;
+        std::cout << "Enter k (binary split count): ";
+        std::cin >> k;
+        data.resize(m);
+        std::cout << "Enter " << m << " integers: ";
+        for (int i = 0; i < m; ++i) std::cin >> data[i];
+    }
+
+    MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&k, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    if (rank != 0) data.resize(m);
+    if (m > 0) MPI_Bcast(data.data(), m, MPI_INT, 0, MPI_COMM_WORLD);
+
+    int n = calc_processes(m, k);
+    int active_size = std::min(n, size);
+
+    if (rank == 0) {
+        std::cout << "m=" << m << ", k=" << k << ", needed processes=" << n
+                  << ", actual=" << active_size << "\n";
+    }
+
+    if (active_size > m) {
+        if (rank == 0) std::cerr << "Error: too many processes\n";
         MPI_Finalize();
         return 1;
     }
-
-    int active_size = std::min(size, m);
 
     MPI_Comm active_comm = MPI_COMM_NULL;
     int color = (rank < active_size) ? 0 : MPI_UNDEFINED;
@@ -66,7 +94,6 @@ int main(int argc, char** argv) {
 
     int local_count = sendcounts[active_rank];
     std::vector<int> local(local_count);
-
     MPI_Scatterv(data.data(), sendcounts.data(), displs.data(), MPI_INT,
                  local.data(), local_count, MPI_INT, 0, active_comm);
 
@@ -100,7 +127,7 @@ int main(int argc, char** argv) {
             MPI_Send(&send_count, 1, MPI_INT, partner, 0, active_comm);
             if (send_count > 0)
                 MPI_Send(local.data(), send_count, MPI_INT, partner, 1, active_comm);
-            std::cout << "Rank " << active_rank << " sent its data to rank " << partner << ", exiting\n";
+            std::cout << "Rank " << active_rank << " sent data to rank " << partner << ", exiting\n";
             break;
         }
     }
