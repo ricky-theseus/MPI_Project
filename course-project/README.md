@@ -65,16 +65,21 @@ init success!!!
 4. **root 执行**锦标赛选择，输出最佳距离
 5. 循环至 `maxGen` 代
 
-### 编译
+### 编译（MSBuild，与其他 homework 一致方式）
+
+打开 **Developer Command Prompt for VS 2022**，然后：
 
 ```cmd
 cd course-project
-cl /TP /O2 /I"%MSMPI_INC%" TSP_MPI.cpp /link /LIBPATH:"%MSMPI_LIB64%" msmpi.lib
+msbuild TSP_MPI.vcxproj /p:Configuration=Release /p:Platform=x64
 ```
+
+或直接双击 `TSP_MPI.vcxproj` 在 Visual Studio 中打开编译。
 
 ### 运行
 
 ```cmd
+cd course-project\x64\Release
 mpiexec -n 4 TSP_MPI.exe
 ```
 
