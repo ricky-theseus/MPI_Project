@@ -1,0 +1,13 @@
+# Algorithm 2: HdEA (Hierarchical Distributed EA)
+# pcb442.tsp, population=200 (50×4 islands), maxGen=200000, processes=4
+# Run	Best	Time(s)
+1	57166	64.07
+2	57062	62.83
+3	57866	63.96
+4	56273	61.96
+5	55544	59.55
+6	55593	55.77
+7	57080	61.75
+8	56932	63.81
+9	56261	61.22
+10	56182	61.56

@@ -1,0 +1,84 @@
+\section{实验结果与分析}
+
+\subsection{运行结果}
+
+三种算法在 pcb442 实例上的 10 次运行结果如下。
+
+\begin{table}[H]
+\centering
+\caption{10 次运行最优解对比}
+\begin{tabular}{crrr}
+\toprule
+运行 & dEA & HdEA & HdEA-MP \\
+\midrule
+1 & 51690 & 57166 & 73349 \\
+2 & 51693 & 57062 & 81099 \\
+3 & 51549 & 57866 & 74888 \\
+4 & 51394 & 56273 & 71605 \\
+5 & 51724 & 55544 & 80696 \\
+6 & 51571 & 55593 & 75038 \\
+7 & 51554 & 57080 & 76812 \\
+8 & 51696 & 56932 & 77613 \\
+9 & 51488 & 56261 & 73665 \\
+10 & 51702 & 56182 & 75596 \\
+\midrule
+\textbf{均值} & \textbf{51606} & \textbf{56596} & \textbf{76036} \\
+\textbf{标准差} & \textbf{112} & \textbf{746} & \textbf{3081} \\
+\textbf{最小值} & \textbf{51394} & \textbf{55544} & \textbf{71605} \\
+\textbf{最大值} & \textbf{51724} & \textbf{57866} & \textbf{81099} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{统计显著性分析}
+
+对三种算法的 10 次结果两两进行配对 t 检验（$\alpha=0.05$），结果见表 \ref{tab:ttest}。
+
+\begin{table}[H]
+\centering
+\caption{配对 t 检验结果}
+\label{tab:ttest}
+\begin{tabular}{lccc}
+\toprule
+对比 & $t$ 值 & $p$ 值 & 是否显著 \\
+\midrule
+dEA vs HdEA & -20.93 & $<0.001$ & 显著，dEA 更优 \\
+dEA vs HdEA-MP & -25.71 & $<0.001$ & 显著，dEA 更优 \\
+HdEA vs HdEA-MP & -19.14 & $<0.001$ & 显著，HdEA 更优 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+所有对比的 $p$ 值均远小于 0.05，说明三种算法的性能差异具有统计显著性。
+
+\subsection{可视化对比}
+
+图 \ref{fig:boxplot} 的箱线图和图 \ref{fig:barplot} 的柱状图直观展示了三种算法的分布特征。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{boxplot.png}
+\caption{箱线图：三种算法 10 次运行结果分布}
+\label{fig:boxplot}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{barplot.png}
+\caption{柱状图：三种算法均值和标准差对比（误差线表示 $\pm 1$ 标准差）}
+\label{fig:barplot}
+\end{figure}
+
+\subsection{结果分析}
+
+从实验结果可以得出以下关键结论：
+
+\begin{enumerate}
+    \item \textbf{dEA 最优：}主从式 dEA（均值 51606，标准差 112）在求解质量上显著优于 HdEA 和 HdEA-MP，且结果高度稳定。dEA 的优势来自于全局共享种群——200 个个体在同一池中竞争、交配，提供了最充分的基因多样性，避免了局部最优的早熟陷阱。
+
+    \item \textbf{HdEA 次之：}分层 HdEA（均值 56596，标准差 746）的求解质量明显低于 dEA。根本原因在于子种群规模过小（每岛仅 50 个个体）。在 442 城市的搜索空间中，50 个个体的种群难以维持足够的多样性，导致各岛屿较快收敛到不同的局部最优。虽然每 20 代进行一次精英迁移，但迁移仅交换最优个体，对恢复种群多样性的帮助有限。
+
+    \item \textbf{HdEA-MP 最差但方差最大：}HdEA-MP（均值 76036，标准差 3081）的求解质量最差，但运行时间最短（约 13 秒）。值得注意的是其极高的标准差（3081），说明环形迁移机制在某些运行中确实引入了多样性，但由于岛屿规模太小，迁移的优质基因无法在种群中有效传播。此外，跑出最优结果的运行也仅达到 71605，仍远逊于 dEA 的最差结果。
+
+    \item \textbf{dEA 与 HdEA-MP 的精度--时间权衡：}dEA 每代需要 2 次全局通信（Bcast + Gatherv），通信开销使每代耗时约 0.22 毫秒；HdEA-MP 大部分时间本地进化、仅每 20 代进行一次小规模环形通信，每代耗时仅约 0.07 毫秒。虽然 dEA 耗时大约是 HdEA-MP 的 3 倍，但 dEA 的解质量提升（降低约 32\% 的路径距离）远超额外通信的成本，在精度优先的场景下 dEA 是更优选择。
+\end{enumerate}

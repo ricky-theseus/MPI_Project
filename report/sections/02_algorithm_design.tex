@@ -1,0 +1,50 @@
+\section{算法设计}
+
+\subsection{共同基础：进化算法求解 TSP}
+
+三种并行算法共享以下进化操作设计：
+
+\begin{itemize}
+    \item \textbf{编码：}采用路径表示法（Permutation Encoding），每个个体是一个长度为 442 的全排列，表示城市的访问顺序。
+    \item \textbf{适应度：}以总路径长度的倒数作为适应度值 $f = 1 / \text{dist}$，路径越短适应度越高。
+    \item \textbf{选择：}锦标赛选择（Tournament Selection），每次随机挑选 5 个个体，取最优者进入下一代。
+    \item \textbf{交叉：}顺序交叉（Order Crossover, OX），随机选择两个切点，子代继承父代 A 的中间片段，空缺部分按父代 B 的循环顺序填充。
+    \item \textbf{变异：}交换变异（Swap Mutation），以 0.02 的概率随机交换路径中的两个城市。
+    \item \textbf{精英保留：}每代保留最优的 3 个个体直接复制到下一代。
+\end{itemize}
+
+\subsection{Algorithm 1：主从式 dEA（Master-Worker）}
+
+dEA 采用经典的主从式架构，使用 MPI\_COMM\_WORLD 中所有 4 个进程，其中 0 号进程作为 Master，其余 3 个作为 Worker：
+
+\begin{itemize}
+    \item Master 维护全局种群（POP=200），每代执行选择、交叉、变异生成完全随机的子代，将子代平均分发给各 Worker 进行适应度评估。
+    \item Worker 接收子代个体，计算完整 TSP 路径距离，将适应度结果返回 Master。
+    \item 使用 MPI\_Bcast 广播子代、MPI\_Gatherv 收集评估结果。
+    \item 计算负载均衡，每代通信 2 次，通信量约 O(POP/np)。
+\end{itemize}
+
+\subsection{Algorithm 2：分层 dEA（HdEA）}
+
+HdEA 采用两层级联式岛屿模型，在 4 个进程上构建主从式架构，但每个进程内部额外运行一个 EA 子种群：
+
+\begin{itemize}
+    \item 第一层（并行）：4 个进程各自维护一个独立的子种群（POP=50），在各自本地执行完整的进化流程（选择--交叉--变异--评估）。
+    \item 第二层（串行）：每经过 MIG\_FREQ=20 代，各进程将本地最优个体通过 MPI\_Gather 发送至 Master（0 号），Master 将收集到的 4 个最优个体注入全局精英池，再将精英池 broadcast 给所有进程。
+    \item 设计思想：子种群在小规模上快速探索不同区域，周期性精英迁移保证全局收敛方向。由于各岛屿运行在各自进程上，无需额外并行度。
+\end{itemize}
+
+\subsection{Algorithm 3：带种群迁移的 HdEA（HdEA-MP）}
+
+HdEA-MP 在 HdEA 的基础上增加了环形种群迁移机制（Ring Migration），旨在进一步提高种群多样性：
+
+\begin{itemize}
+    \item 进化过程与 HdEA 相同，每个进程上运行独立子种群（POP=50）。
+    \item 每经过 MIG\_FREQ=20 代，除精英迁移外，额外执行一次环形迁移：
+    \begin{itemize}
+        \item 每个进程选出最优的 MIG\_M=3 个个体。
+        \item 使用 MPI\_Sendrecv 将 3 个最优个体打包发送至右邻居进程（(rk+1) mod np），同时从左邻居进程（(rk-1+np) mod np）接收 3 个个体。
+        \item 接收到的迁移个体如果优于本地最差个体，则替换之。
+    \end{itemize}
+    \item 设计思想：环形拓扑模拟自然界中物种沿地理邻域的扩散迁移，促进局部基因交流，期望在保持岛屿独立性的同时引入新鲜基因。
+\end{itemize}

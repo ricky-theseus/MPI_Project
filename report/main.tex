@@ -1,0 +1,79 @@
+\documentclass[12pt,a4paper]{ctexart}
+
+\usepackage[top=2.5cm,bottom=2.5cm,left=2.5cm,right=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\graphicspath{{./img/}{./figures/}}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{subcaption}
+
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{fontspec}
+
+\lstset{
+    language=C++,
+    basicstyle=\small\fontspec{DejaVu Sans Mono},
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    frame=single,
+    breaklines=true,
+    showstringspaces=false,
+    tabsize=4,
+}
+
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue,
+}
+
+\title{
+    \includegraphics[width=7cm]{emblem.png}\\[0.8cm]
+    {\heiti\zihao{2}
+     基于 MPI 的并行分布计算课程报告\\[0.3cm]
+     ——分层分布式进化算法求解 TSP}
+}
+\author{\kaishu\zihao{4}
+    \vspace{1.5cm}
+    \begin{tabular}{rl@{\qquad}rl}
+    姓名：& \underline{ } &
+    班级：& \underline{ } \\[0.5cm]
+    学号：& \underline{ } &
+    日期：& \underline{ 年 月}
+    \end{tabular}
+}
+\date{}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+\pagenumbering{gobble}
+\newpage
+
+\pagenumbering{arabic}
+\tableofcontents
+\newpage
+
+\include{sections/00_abstract}
+\include{sections/01_introduction}
+\include{sections/02_algorithm_design}
+\include{sections/03_experimental_setup}
+\include{sections/04_results}
+\include{sections/05_conclusion}
+\include{sections/99_appendix}
+
+\end{document}

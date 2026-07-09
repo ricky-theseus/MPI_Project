@@ -1,112 +1,121 @@
-# 课程设计：TSP 并行计算解决方案
+# 课程设计：TSP 并行进化算法（三种 MPI 算法实现与对比）
 
-## 文件说明
+## 目录结构
 
-| 文件 | 说明 |
-|---|---|
-| `TSP0.C` | 串行 TSP 求解器（群体搜索 + 反转变异） |
-| `TSP_MPI.cpp` | MPI 并行版 TSP 求解器 |
-| `pcb442.tsp` | TSPLIB 标准测试集，442 个 PCB 钻孔城市坐标 |
+| 目录 | 内容 |
+|------|------|
+| `01_分布式进化算法/` | **算法 1**：主从式分布式进化算法 (dEA) |
+| `02_分层分布式进化算法/` | **算法 2**：分层分布式进化算法 (HdEA) |
+| `03_移动种群分层分布式进化算法/` | **算法 3**：带迁移的分层分布式进化算法 (HdEA-MP) |
+| `TSP0.C` | 串行参考实现 |
+| `TSP_MPI.cpp` | MPI 并行版（算法 1 原型） |
+| `pcb442.tsp` | TSPLIB 标准测试集，442 个城市 |
 | `hierarchical.pdf` | 参考文献 |
-| `TSP0.exe` | 串行可执行文件 |
+
+每个算法目录下包含：
+- 独立可编译的 `.cpp` 源码
+- 已编译的 `.exe` 可执行文件
+- 该算法的说明 README
 
 ## 问题描述
 
-旅行商问题（TSP）：给定 n 个城市及两两间的距离，求经过每个城市恰好一次的最短回路。
+旅行商问题（TSP）：给定 n 个城市及两两间的距离，求经过每个城市恰好一次的最短回路。使用 `pcb442.tsp`（442 个城市，整数欧氏距离）。
 
-测试数据 `pcb442.tsp` 来自 TSPLIB，包含 442 个城市，坐标为 PCB 钻孔位置，距离取四舍五入后的整数欧氏距离。
+## 实验环境
 
-## 串行版（TSP0.C）
+- **CPU**: AMD Ryzen 7 5800X (8C/16T)
+- **RAM**: 32 GB
+- **OS**: Windows 10
+- **MPI**: Microsoft MPI v10.1
+- **Compiler**: Visual Studio 2022 (MSVC 19.44) x64, Release 模式
 
-### 算法
+## 三种算法架构
 
-维护 `xColony` 条随机路径（排列），每轮对每条路径执行**反转变异**（翻转两城市间的一段），变异来源有概率随机或从另一条路径继承。每 `xColony` 轮执行一次父子锦标赛选择。
+### 算法 1：分布式进化算法 (dEA)
 
-### 编译与运行
+**主从式（Master-Worker）细粒度并行。**
 
-打开 **Developer Command Prompt for VS 2022**（或执行 `VsDevCmd.bat`），然后：
+- rank 0（master）维护整个全局种群
+- 每代广播完整种群到所有 worker
+- 每个 worker 对其分配的路径子集执行反转变异
+- 收集子代结果回 master
+- master 执行锦标赛选择
 
-```cmd
-cd course-project
-cl /TC /O2 TSP0.C
-TSP0.exe
-```
+**特点**：通信密集（每代 2 次全广播），全局同步，逻辑与串行版最接近。
 
-`/TC` 强制以 C 语言编译。输入文件 `pcb442.tsp` 放在当前目录。标准输出打印每代最佳距离：
+### 算法 2：分层分布式进化算法 (HdEA)
 
-```
-init success!!!
-2:720740.000000
-...
-2000:340177.000000
-```
+**岛屿模型 + 双层层次结构。**
 
-详细日志追加到 `tsp0.txt`，每行格式：`<代数>  <耗时秒>  <距离>`
+- **下层**：每个 rank 独立维护一个子种群（岛屿），独立进化
+- **上层**：rank 0 维护精英种群，每 MIGRATE_INTERVAL 代收集各岛屿的最优个体，额外进化后广播全局最优回所有岛屿
 
-### 参数调优
+**特点**：通信稀疏（每 MIGRATE_INTERVAL=50 代通信一次），适合大规模集群。
 
-编辑 `TSP0.C` 顶部变量：
+### 算法 3：移动种群分层分布式进化算法 (HdEA-MP)
 
-| 变量 | 默认值 | 含义 |
-|---|---|---|
-| `xColony` | 100 | 群体大小（路径数量） |
-| `probab1` | 0.02 | 随机变异概率 |
-| `maxGen` | 200000 | 最大迭代代数 |
+在算法 2 的基础上增加**环状迁移**：
 
-## MPI 并行版（TSP_MPI.cpp）
+- 继承算法 2 的层次结构
+- 每 MIGRATE_INTERVAL 代，除层次通信外，各岛屿将其 M=3 个最优个体发送给下一个 rank（环状拓扑）
+- 接收到的迁移个体替换接收方的最差个体
 
-### 并行策略
+**特点**：层次结构保证全局收敛压力，环状迁移增强种群多样性。
 
-将 `xColony` 条路径均匀分配到所有 MPI 进程，每代流程：
+## 编译与运行
 
-1. **root 广播**当前群体到所有进程（保证跨进程的变异参考正确性）
-2. **各进程独立**对其分块的路径执行反转变异 + 距离计算
-3. **gather** 子代结果回 root
-4. **root 执行**锦标赛选择，输出最佳距离
-5. 循环至 `maxGen` 代
-
-### 编译（MSBuild，与其他 homework 一致方式）
-
-#### CMD
+### 编译（使用 VS 2022 开发者命令提示符）
 
 ```cmd
 cd course-project
-msbuild TSP_MPI.vcxproj /p:Configuration=Release /p:Platform=x64
+
+:: 算法 1
+cl /EHsc /I"%MSMPI_INC%" 01_分布式进化算法\TSP_dEA.cpp /link /LIBPATH:"%MSMPI_LIB64%" msmpi.lib
+
+:: 算法 2
+cl /EHsc /I"%MSMPI_INC%" 02_分层分布式进化算法\TSP_HdEA.cpp /link /LIBPATH:"%MSMPI_LIB64%" msmpi.lib
+
+:: 算法 3
+cl /EHsc /I"%MSMPI_INC%" 03_移动种群分层分布式进化算法\TSP_HdEA_MP.cpp /link /LIBPATH:"%MSMPI_LIB64%" msmpi.lib
 ```
-
-#### PowerShell
-
-```powershell
-Set-Location course-project
-msbuild TSP_MPI.vcxproj /p:Configuration=Release /p:Platform=x64
-```
-
-或直接双击 `TSP_MPI.vcxproj` 在 Visual Studio 中打开编译。
 
 ### 运行
 
-#### CMD
-
 ```cmd
-cd course-project\x64\Release
-mpiexec -n 4 TSP_MPI.exe
+cd course-project
+mpiexec -n 4 01_分布式进化算法\TSP_dEA.exe [runs] [maxGen]
+mpiexec -n 4 02_分层分布式进化算法\TSP_HdEA.exe [runs] [maxGen]
+mpiexec -n 4 03_移动种群分层分布式进化算法\TSP_HdEA_MP.exe [runs] [maxGen]
 ```
 
-#### PowerShell
+## 实验结果
 
-```powershell
-Set-Location course-project\x64\Release
-mpiexec -n 4 TSP_MPI.exe
-```
+> TODO: 在 10 次运行后填入
 
-进程数建议整除 `xColony`（100），例如 2、4、5、10 等，使负载均衡。
+| 算法 | mean | std | min | max |
+|------|------|-----|-----|-----|
+| dEA | - | - | - | - |
+| HdEA | - | - | - | - |
+| HdEA-MP | - | - | - | - |
 
-### 与串行版对比
+### T 检验（p < 0.05）
 
-| 方面 | TSP0.C | TSP_MPI.cpp |
-|---|---|---|
-| 语言 | C | C++（含 MPI） |
-| 随机种子 | `srand(time(NULL))` | `srand(time(NULL) + rank)` 各进程不同 |
-| 计时 | `clock()` | `MPI_Wtime()` |
-| 输出 | stdout + tsp0.txt | 同串行 |
-| 加速方式 | 单线程 | 多进程并行评估 |
+| 对比组 | t | p | 结论 |
+|--------|---|---|------|
+| dEA vs HdEA | - | - | - |
+| dEA vs HdEA-MP | - | - | - |
+| HdEA vs HdEA-MP | - | - | - |
+
+### 分析
+
+> 实验结果分析待补充。
+
+## 参数配置
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| 种群大小 | 50/岛, 50/精英 | 算法 1: 100 全局; 算法 2/3: 50/岛 × 4 = 200 总 |
+| 变异概率 | 0.02 | 随机变异 vs 交叉继承 |
+| 迁移间隔 | 50 代 | 层次/环状通信频率 |
+| 精英进化代数 | 20 | master 每轮进化精英种群的代数 |
+| 迁移个体数 | 3 | 算法 3 的环状迁移中每次发送的个体数 |

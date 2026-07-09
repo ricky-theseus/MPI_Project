@@ -1,0 +1,24 @@
+\contentsline {section}{\numberline {1}摘要}{2}{section.1}%
+\contentsline {section}{\numberline {2}引言}{3}{section.2}%
+\contentsline {section}{\numberline {3}算法设计}{4}{section.3}%
+\contentsline {subsection}{\numberline {3.1}共同基础：进化算法求解 TSP}{4}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Algorithm 1：主从式 dEA（Master-Worker）}{4}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Algorithm 2：分层 dEA（HdEA）}{4}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Algorithm 3：带种群迁移的 HdEA（HdEA-MP）}{5}{subsection.3.4}%
+\contentsline {section}{\numberline {4}实验设置}{6}{section.4}%
+\contentsline {subsection}{\numberline {4.1}测试实例}{6}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}计算环境}{6}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}算法参数}{6}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}评价指标}{6}{subsection.4.4}%
+\contentsline {section}{\numberline {5}实验结果与分析}{8}{section.5}%
+\contentsline {subsection}{\numberline {5.1}运行结果}{8}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}统计显著性分析}{8}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}可视化对比}{8}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}结果分析}{9}{subsection.5.4}%
+\contentsline {section}{\numberline {6}结论}{11}{section.6}%
+\contentsline {section}{\numberline {7}附录：Homework 源码与说明}{12}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Homework 2：并行归并排序}{12}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Homework 3：MPI 矩阵乘法}{15}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}Homework 4：用 MPI\_Send / MPI\_Recv 实现 MPI\_Gather}{17}{subsection.7.3}%
+\contentsline {subsection}{\numberline {7.4}Homework 5：用 MPI\_Send / MPI\_Recv 实现 MPI\_Allgather}{19}{subsection.7.4}%
+\contentsline {subsection}{\numberline {7.5}Homework 6：思政思考——华为在高性能/并行计算领域的核心竞争力}{21}{subsection.7.5}%

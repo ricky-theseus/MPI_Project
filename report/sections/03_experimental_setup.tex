@@ -1,0 +1,54 @@
+\section{实验设置}
+
+\subsection{测试实例}
+
+选用 TSPLIB 标准基准实例 \texttt{pcb442.tsp}（442 城市，最优解距离 50778）。该实例规模适中，适合在 4 进程上进行短时间实验。
+
+\subsection{计算环境}
+
+\begin{table}[H]
+\centering
+\caption{计算环境}
+\begin{tabular}{ll}
+\toprule
+项目 & 配置 \\
+\midrule
+CPU & Intel Core i7-13700H, 14 核 20 线程 \\
+内存 & 32 GB DDR5 \\
+操作系统 & Windows 11 \\
+MPI 实现 & Microsoft MPI (MS-MPI) v10 \\
+编译器 & MSVC 2022 (x64) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{算法参数}
+
+\begin{table}[H]
+\centering
+\caption{算法参数}
+\begin{tabular}{lccc}
+\toprule
+参数 & dEA & HdEA & HdEA-MP \\
+\midrule
+进程数 & 4 & 4 & 4 \\
+种群规模 & 200 & 50 $\times$ 4 & 50 $\times$ 4 \\
+最大代数 & 200000 & 200000 & 200000 \\
+锦标赛规模 & 5 & 5 & 5 \\
+变异率 & 0.02 & 0.02 & 0.02 \\
+精英数 & 3 & 3 & 3 \\
+迁移频率 & --- & 20 & 20 \\
+迁移个体数 MIG\_M & --- & --- & 3 \\
+运行次数 & 10 & 10 & 10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{评价指标}
+
+\begin{itemize}
+    \item \textbf{最优解（Best）：}10 次运行中的最短路径距离。
+    \item \textbf{平均值（Mean）：}10 次平均最短距离，反映算法稳定性。
+    \item \textbf{标准差（Std）：}10 次运行结果的分散程度。
+    \item \textbf{配对 t 检验：}对三种算法的 10 次结果两两进行配对 t 检验，判断差异是否统计显著。
+\end{itemize}
