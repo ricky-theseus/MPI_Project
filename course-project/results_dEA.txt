@@ -1,0 +1,13 @@
+# Algorithm 1: dEA (Distributed Evolutionary Algorithm)
+# pcb442.tsp, population=100, maxGen=200000, processes=4
+# Run	Best	Time(s)
+1	51690	43.76
+2	51693	44.77
+3	51549	44.12
+4	51394	43.98
+5	51724	47.58
+6	51571	44.82
+7	51554	44.84
+8	51696	44.05
+9	51488	44.50
+10	51702	43.89

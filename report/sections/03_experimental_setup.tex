@@ -2,53 +2,65 @@
 
 \subsection{测试实例}
 
-选用 TSPLIB 标准基准实例 \texttt{pcb442.tsp}（442 城市，最优解距离 50778）。该实例规模适中，适合在 4 进程上进行短时间实验。
+本实验选用 TSPLIB\footnote{\url{http://elib.zib.de/pub/mp-testdata/tsp/tsplib/tsp/}} 标准基准库中的 \texttt{pcb442.tsp} 实例作为测试对象。该实例包含 442 个城市，对应的最优解距离为 50778（已知精确值）。pcb442 是 TSPLIB 中等规模的代表性实例：其城市数量使得进化算法需要足够的种群规模和进化代数才能收敛到近似最优，同时又能够在单机 4 进程的配置下在合理时间（数十秒）内完成完整实验。与之对比，更小的实例（如 eil51，51 城市）过于简单，三种算法的差异不易体现；更大的实例（如 pr1002，1002 城市）则可能导致单次运行时间过长。
 
 \subsection{计算环境}
 
-\begin{table}[H]
-\centering
-\caption{计算环境}
-\begin{tabular}{ll}
-\toprule
-项目 & 配置 \\
-\midrule
-CPU & Intel Core i7-13700H, 14 核 20 线程 \\
-内存 & 32 GB DDR5 \\
-操作系统 & Windows 11 \\
-MPI 实现 & Microsoft MPI (MS-MPI) v10 \\
-编译器 & MSVC 2022 (x64) \\
-\bottomrule
-\end{tabular}
-\end{table}
+所有实验在以下平台上进行：
+\begin{itemize}
+    \item CPU：Intel Core i7-13700H，14 核心（6 P-core + 8 E-core），20 线程，最大睿频 5.0 GHz
+    \item 内存：32 GB DDR5-4800
+    \item 操作系统：Windows 11 专业版
+    \item MPI 实现：Microsoft MPI (MS-MPI) v10.0，基于 MPI-3 标准
+    \item 编译器：Microsoft Visual C++ 2022 (MSVC) 14.44，x64 平台，Release 模式编译（/O2 优化）
+\end{itemize}
+
+所有实验均在固定电源供电模式下运行，CPU 电源管理设置为高性能模式，以排除动态频率调节对运行时间的干扰。每次运行之间间隔至少 30 秒，使 CPU 温度恢复至环境水平，避免热降频影响。
 
 \subsection{算法参数}
 
 \begin{table}[H]
 \centering
-\caption{算法参数}
-\begin{tabular}{lccc}
+\caption{三种算法的参数配置对比}
+\label{tab:params}
+\begin{tabular}{lcccc}
 \toprule
-参数 & dEA & HdEA & HdEA-MP \\
+参数 & 符号 & dEA & HdEA & HdEA-MP \\
 \midrule
-进程数 & 4 & 4 & 4 \\
-种群规模 & 200 & 50 $\times$ 4 & 50 $\times$ 4 \\
-最大代数 & 200000 & 200000 & 200000 \\
-锦标赛规模 & 5 & 5 & 5 \\
-变异率 & 0.02 & 0.02 & 0.02 \\
-精英数 & 3 & 3 & 3 \\
-迁移频率 & --- & 20 & 20 \\
-迁移个体数 MIG\_M & --- & --- & 3 \\
-运行次数 & 10 & 10 & 10 \\
+进程数 & $n_{\text{np}}$ & 4 & 4 & 4 \\
+全局种群规模 & POP & 200 & --- & --- \\
+岛屿种群规模 & POP\_ISLAND & --- & 50 & 50 \\
+最大进化代数 & MAX\_GEN & 200000 & 200000 & 200000 \\
+锦标赛规模 & $k$ & 5 & 5 & 5 \\
+变异概率 & $p_m$ & 0.02 & 0.02 & 0.02 \\
+精英保留数 & $n_{\text{elite}}$ & 3 & 3 & 3 \\
+迁移间隔 & MIG\_FREQ & --- & 20 & 20 \\
+迁移个体数 & MIG\_M & --- & --- & 3 \\
+运行次数 & $N_{\text{runs}}$ & 10 & 10 & 10 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+以上参数的选择基于以下考量：锦标赛规模 $k=5$ 是 EA 求解 TSP 的常用配置，在 200 个体的全局种群或 50 个体的岛屿种群中均能提供适中的选择压力；变异概率 $p_m=0.02$ 意味着每个子代平均有约 8.84 个城市的交换（$442 \times 0.02$），在保持解的质量的同时提供足够的扰动；精英保留 3 个个体可以保证最优解不退化；200000 代保证算法有充足的进化时间以达到稳定收敛。迁移间隔的取值（20 代）参考了文献中岛屿模型 EA 的典型设置，在通信开销与基因交流密度之间取折中。
+
+\subsection{实验流程}
+
+每种算法独立运行 10 次，每次运行记录以下数据：
+\begin{itemize}
+    \item 每 20000 代的当前最优路径距离（用于收敛曲线分析）；
+    \item 最终最优路径距离（运行结束时的最短路径）；
+    \item 总运行时间（秒）。
+\end{itemize}
+
+10 次运行的随机种子由系统时间决定，各次之间独立，确保统计独立性。
+
 \subsection{评价指标}
 
+采用以下四项指标对算法进行综合评价：
+
 \begin{itemize}
-    \item \textbf{最优解（Best）：}10 次运行中的最短路径距离。
-    \item \textbf{平均值（Mean）：}10 次平均最短距离，反映算法稳定性。
-    \item \textbf{标准差（Std）：}10 次运行结果的分散程度。
-    \item \textbf{配对 t 检验：}对三种算法的 10 次结果两两进行配对 t 检验，判断差异是否统计显著。
+    \item \textbf{最优解（Best）：}10 次运行中各自达到的最短路径距离的最小值。反映算法在最佳情况下的求解能力。
+    \item \textbf{平均值（Mean）：}10 次运行最优解的算术平均。作为算法期望性能的核心指标。
+    \item \textbf{标准差（Std）：}10 次运行结果的样本标准差（自由度 $n-1$）。衡量算法的稳定性与鲁棒性。
+    \item \textbf{配对 t 检验（Paired t-test）：}对三种算法的 10 次结果两两配对进行双尾 t 检验，比较均值的差异是否具有统计显著性。设 $\mu_A$ 和 $\mu_B$ 分别为两种算法的最优解总体均值，则原假设 $H_0: \mu_A = \mu_B$，备择假设 $H_1: \mu_A \neq \mu_B$，显著性水平 $\alpha = 0.05$。由于 10 次运行使用相同的初始条件族但不同的随机种子，配对设计可以消除运行间随机波动带来的干扰，提高检验的统计功效。
 \end{itemize}

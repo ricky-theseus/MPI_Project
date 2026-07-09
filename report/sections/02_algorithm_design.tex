@@ -1,27 +1,167 @@
 \section{算法设计}
 
-\subsection{共同基础：进化算法求解 TSP}
+\subsection{共同基础：进化操作设计}
 
-三种并行算法共享相同的进化操作框架，均采用路径表示法对 TSP 解进行编码——每个个体为一个长度为 442 的全排列，表示城市的访问顺序。适应度函数定义为总路径长度的倒数 $f = 1 / \text{dist}$，路径越短则适应度越高。
+三种并行算法共享相同的进化操作框架，本节对所使用的编码方案、适应度函数及遗传算子进行统一说明。
 
-选择操作采用锦标赛选择（Tournament Selection），每代从当前种群中随机抽取 5 个个体，取其中适应度最优者进入下一代。交叉操作采用顺序交叉（Order Crossover, OX）：随机选择两个切点，子代继承父代 A 的中间片段，空缺部分按父代 B 的原始循环顺序依次填充，从而保证子代仍为合法的全排列。变异操作采用交换变异（Swap Mutation），以 0.02 的概率随机交换个体编码中两个不同位置的城市。此外，每代保留适应度最高的 3 个个体直接复制至下一代，作为精英保留策略。
+\subsubsection{编码与适应度函数}
 
-\subsection{Algorithm 1：主从式 dEA（Master-Worker）}
+采用最直观的路径表示法（Permutation Encoding）对 TSP 解进行编码。每个个体由一个长度为 442 的全排列 $\pi = (\pi_1, \pi_2, \dots, \pi_{442})$ 表示，其中 $\pi_i$ 为城市编号，排列的顺序即为旅行商访问城市的顺序。路径的总长度为
 
-dEA 是经典的主从式并行进化算法，其对 MPI\_COMM\_WORLD 中全部 4 个进程进行角色分工：0 号进程担任 Master，其余 3 个进程担任 Worker。Master 维护全局种群（规模为 200），在每一代中依次执行锦标赛选择、顺序交叉和交换变异，生成完全随机的子代个体池。随后，Master 利用 MPI\_Bcast 将子代均匀广播至所有 Worker，各 Worker 在收到子代后逐一计算完整的 TSP 路径距离并将评估结果通过 MPI\_Gatherv 返回给 Master。Master 根据评估结果更新全局种群，进入下一代循环。
+\[
+L(\pi) = \sum_{i=1}^{441} d_{\pi_i,\pi_{i+1}} + d_{\pi_{442},\pi_1},
+\]
 
-该架构的计算负载在 Worker 之间自然均衡，每代的通信仅包含两次全局集体操作——一次 Bcast 和一次 Gatherv，通信量约为 $\mathcal{O}(\text{POP}/\text{np})$。由于评估工作是 TSP 进化中计算最密集的环节，将评估任务分发到多个 Worker 可以显著加速每代的执行，而 Master 上的选择与交叉操作相对于评估而言开销极低，因此该架构总体达到了良好的加速比。
+其中 $d_{ij}$ 为城市 $i$ 与城市 $j$ 之间的欧氏距离。适应度函数定义为路径长度的倒数：
+
+\[
+f(\pi) = \frac{1}{L(\pi)},
+\]
+
+路径越短则适应度越高，选择操作倾向于保留适应度较高的个体。
+
+\subsubsection{种群初始化}
+
+初始种群由随机生成的全排列构成。对于每个个体，采用 Fisher--Yates 洗牌算法生成长度为 442 的随机排列，确保搜索空间初始覆盖的均匀性。dEA 的全局种群规模为 200，HdEA 与 HdEA-MP 的每个岛屿种群规模为 50。
+
+\subsubsection{选择算子}
+
+采用锦标赛选择（Tournament Selection）作为选择算子。每代在选择父代时，从当前种群中随机抽取 $k=5$ 个个体，比较其适应度，选择适应度最高的个体进入交配池。锦标赛选择的优点是计算简单、不依赖全局适应度排序、且可以通过调整锦标赛规模 $k$ 灵活控制选择压力——$k$ 越大，选择压力越强，种群收敛越快但也更容易陷入局部最优。
+
+\subsubsection{交叉算子}
+
+采用顺序交叉（Order Crossover, OX）作为交叉算子。给定两个父代个体 $P_1$ 和 $P_2$，OX 的操作步骤如下：
+
+\begin{enumerate}
+    \item 在排列长度范围内随机选择两个切点 $a$ 和 $b$（$a < b$），将父代划分为左、中、右三段。
+    \item 子代 $O_1$ 继承父代 $P_1$ 的中间片段 $P_1[a:b]$，保持位置不变。
+    \item 从父代 $P_2$ 的 $b$ 位置开始循环遍历，将所有不在 $O_1$ 中的城市按顺序填入 $O_1$ 的剩余空位（从位置 $b$ 开始，循环至位置末尾再回到开头）。
+    \item 对称地，子代 $O_2$ 以 $P_2$ 的中间片段为基础，从 $P_1$ 中填充剩余城市。
+\end{enumerate}
+
+OX 的独特优势在于它不仅继承了两个父代的基因片段，还保留了父代中城市之间的相对顺序信息，同时保证子代仍然是合法的全排列。对于 442 规模的 TSP，OX 能够在路径重构与节段继承之间取得良好平衡。
+
+\subsubsection{变异算子}
+
+采用交换变异（Swap Mutation）。对每个新生成的子代，以概率 $p_m = 0.02$ 随机选择其编码中的两个不同位置，交换这两个位置上的城市编号。变异操作的主要作用是在进化后期种群多样性下降时，为种群引入微小的扰动，帮助算法跳出局部最优。
+
+\subsubsection{精英保留策略}
+
+每代在完成选择、交叉和变异后，从上一代种群中选取适应度最高的 3 个个体（精英），直接复制到下一代种群中，替换掉子代种群中最差的 3 个个体。精英保留策略保证了算法的最优解在世代间不会退化，是进化算法收敛性的重要保障。
+
+\subsection{Algorithm 1：主从式 dEA}
+
+主从式分布式进化算法（dEA）采用最简单的并行架构——一个 Master 进程负责全局进化逻辑，多个 Worker 进程负责最耗时的适应度评估环节。这种架构的核心思想是将计算密集部分并行化，而保持控制逻辑的集中以提高协调效率。
+
+\subsubsection{架构与通信模式}
+
+dEA 使用 MPI\_COMM\_WORLD 中的全部 4 个进程，其中 rank 0 为 Master，rank 1--3 为 Worker。Master 维护一个全局种群（规模 POP = 200），在每一代中依次执行以下步骤：
+
+\begin{enumerate}
+    \item \textbf{选择与繁殖：}Master 执行锦标赛选择、OX 交叉和交换变异，从上一代的 200 个个体中生成 200 个全新子代。
+    \item \textbf{分发评估：}Master 利用 MPI\_Bcast 将 200 个子代组成的数组广播至所有 Worker。每个 Worker 分到约 67 个子代个体。
+    \item \textbf{并行评估：}3 个 Worker 各自计算所分配子代的 TSP 路径距离（即适应度），评估过程完全独立、无进程间通信。
+    \item \textbf{结果收集：}Worker 通过 MPI\_Gatherv 将评估结果（距离值数组）发送回 Master。Master 根据收集到的适应度值更新全局种群。
+\end{enumerate}
+
+此过程重复执行直到达到最大进化代数 MAX\_GEN = 200000。
+
+\subsubsection{算法伪码}
+
+\begin{lstlisting}[language={},basicstyle=\scriptsize\fontspec{DejaVu Sans Mono}]
+Algorithm 1: dEA (Master-Worker)
+  if rank == 0 then           // Master
+      POP ← 200, MAX_GEN ← 200000
+      初始化全局种群 pop[POP]
+      for gen = 1 to MAX_GEN do
+          offspring ← SelectionCrossoverMutation(pop)
+          MPI_Bcast(offspring, 0, MPI_COMM_WORLD)
+          MPI_Gatherv(fitness, 0, MPI_COMM_WORLD)
+          pop ← UpdatePopulation(pop, offspring, fitness)
+      end for
+  else                         // Worker
+      while true do
+          MPI_Bcast(offspring, 0, MPI_COMM_WORLD)
+          for each ind in offspring do
+              fitness[ind] ← EvaluateTSPDistance(ind)
+          end for
+          MPI_Gatherv(fitness, 0, MPI_COMM_WORLD)
+      end while
+  end if
+\end{lstlisting}
+
+\subsubsection{通信复杂度分析}
+
+dEA 每代需要两次全局集体通信操作：MPI\_Bcast 广播子代数组（$\mathcal{O}(\text{POP} \cdot n)$ 字节）和 MPI\_Gatherv 收集评估结果（$\mathcal{O}(\text{POP})$ 字节），其中 $n=442$ 为城市数。在 $n_{\text{np}} = 4$ 的条件下，Bcast 的通信复杂度为 $\mathcal{O}(\text{POP} \cdot n \cdot \log n_{\text{np}} / n_{\text{np}})$。考虑到 Master 上的选择交叉操作与 Worker 上的适应度评估之间存在天然流水线重叠，实际运行中通信开销被有效隐藏。计算负载方面，由于子代被均匀分发，各 Worker 承担的评估量相等（偏差 $\le 1$），实现了高度均衡的负载分配。
 
 \subsection{Algorithm 2：分层 dEA（HdEA）}
 
-HdEA 在 dEA 的基础上引入两层级联式岛屿模型，旨在通过种群的空间隔离来维持多样性，同时通过周期性的精英迁移保证全局收敛方向。4 个进程各自维护一个独立的子种群（每岛规模为 50），每个进程在本地独立执行完整的进化流程——选择、交叉、变异与适应度评估，进程之间不进行逐代的同步通信。
+HdEA 将种群划分为多个独立演化的岛屿，并在岛屿之上增加一层精英协调，形成两层级联式架构。其设计动机源于岛屿模型在维持种群多样性方面的理论优势——通过限制个体交配的范围，不同岛屿可以探索搜索空间中差异化的区域，延缓早熟收敛。
 
-第一层的并行进化在 4 个岛屿上持续进行。第二层为稀疏同步层：每经过 MIG\_FREQ = 20 代，各进程通过 MPI\_Gather 将本地最优个体发送至 Master（0 号进程）。Master 将收集到的 4 个最优个体汇集成全局精英池，再通过 MPI\_Bcast 广播回所有进程，各进程据此更新自身的精英存档。这一异步与同步交替的设计，使得子种群在大部分时间内以小规模独立探索搜索空间的不同区域，仅定期交换最优个体以防止各岛屿偏离全局最优方向。然而，由于每岛仅 50 个个体，对于 442 城市的 TSP 搜索空间而言，这一规模难以维持足够的种群多样性，各岛屿倾向于在早期世代便收敛至不同局部最优。
+\subsubsection{架构与通信模式}
+
+HdEA 同样使用 4 个 MPI 进程，但每个进程的角色与 dEA 有本质区别：
+
+\begin{itemize}
+    \item \textbf{第一层（岛屿并行层）：}4 个进程各自维护一个完全独立的子种群（规模 POP\_ISLAND = 50），在各进程内部独立执行完整的 EA 流程——锦标赛选择、OX 交叉、交换变异、适应度评估和精英保留——持续运行 MIG\_FREQ = 20 代。在此阶段，进程之间完全不存在任何通信，每个岛屿相当于一个串行 EA。
+
+    \item \textbf{第二层（精英协调层）：}每隔 MIG\_FREQ 代，各进程通过 MPI\_Gather 将本岛适应度最高的 3 个精英个体发送至 Master（rank 0）。Master 将所有岛屿的精英汇总（共 $4 \times 3 = 12$ 个个体），选择其中全局最优的若干个体，再通过 MPI\_Bcast 广播给所有进程。各进程据此更新本地的精英存档。
+\end{itemize}
+
+\subsubsection{设计动机与预期效果}
+
+HdEA 的设计基于以下关键洞察：种群多样性对于进化算法的搜索能力至关重要。根据遗传漂变理论，小种群的遗传多样性会因采样效应快速丢失，而将一个大种群隔离为多个小型子种群，可以通过限制基因流动来减缓局部最优的传播。理想情况下，不同岛屿在各自的小生态位中独立进化，可能发现不同的高质量解区域，再通过周期性的精英迁移实现全局信息的共享。
+
+然而，这种设计方案也面临一个内在矛盾：岛屿规模越小，多样性损失越快，但岛屿数量越多，并行度越高。在 4 进程的条件下，每个岛屿只能分到 50 个个体，对于一个 442 城市的搜索空间而言，50 个个体所能覆盖的搜索范围极为有限。
 
 \subsection{Algorithm 3：带种群迁移的 HdEA（HdEA-MP）}
 
-HdEA-MP 在 HdEA 的基础上进一步引入环形种群迁移机制（Ring Migration），以期在岛屿之间实现更密集的基因交流。其进化过程与 HdEA 一致，每个进程上运行规模为 50 的独立子种群。区别在于，每经过 MIG\_FREQ = 20 代，除精英迁移之外，额外执行一次环形拓扑下的个体交换。
+HdEA-MP 在 HdEA 的两层架构之上，额外引入第三层机制——环形种群迁移（Ring Migration），通过增加岛屿之间的个体交换频率和交换量，缓解岛屿规模过小导致的多样性不足问题。
 
-具体而言，每个进程从自身子种群中选取适应度最高的 MIG\_M = 3 个个体，将其路径编码与适应度值打包为平面缓冲区，通过 MPI\_Sendrecv 一次性发送至右邻居进程（(rk + 1) mod np），同时从左邻居进程（(rk - 1 + np) mod np）接收 3 个迁移个体。若接收到的个体适应度优于本地种群中的最差个体，则用前者替换后者。该机制模拟了自然界中物种沿地理邻域进行局部扩散迁移的模式，期望在保持岛屿之间一定独立性的同时，为各子种群注入新鲜基因，缓解早熟收敛。
+\subsubsection{环形迁移机制}
 
-采用 MPI\_Sendrecv 而非交替的 MPI\_Send 与 MPI\_Recv，可以避免因 MPI 内部缓冲区不足而导致的死锁问题，同时也简化了环形拓扑下的通信逻辑。
+与 HdEA 仅在 Master 处进行精英汇聚不同，HdEA-MP 在每 MIG\_FREQ = 20 代时，除执行精英迁移外，额外执行一次进程间的直接个体交换。具体流程如下：
+
+\begin{enumerate}
+    \item 每个进程从自身子种群中挑选适应度最高的 MIG\_M = 3 个个体。
+    \item 将这 3 个个体的完整路径编码（$3 \times 442$ 个整数）和适应度值（3 个双精度浮点数，但发送时取整为整数）打包为一个平面缓冲区。
+    \item 通过 MPI\_Sendrecv 将打包数据发送至右邻居进程 $(rk + 1) \bmod 4$，同时从左邻居进程 $(rk - 1 + 4) \bmod 4$ 接收同样格式的迁移数据。
+    \item 对接收到的 3 个迁移个体，逐一判断其路径长度是否小于本地种群中的最差个体（即适应度是否更高），若是，则用迁移个体替换最差个体。
+\end{enumerate}
+
+环形拓扑在并行计算中具有天然的对称性和良好的扩展性。对于 $n_{\text{np}}$ 个进程，环形通信仅需 $n_{\text{np}}$ 个点到点通信（或 $n_{\text{np}}$ 对 MPI\_Sendrecv），通信复杂度为 $\mathcal{O}(n_{\text{np}})$，且不需要 Master 中转，避免了集中式通信的瓶颈。
+
+\subsubsection{MPI\_Sendrecv 的设计选择}
+
+在最初的原型实现中，环形迁移采用交替的 MPI\_Send 和 MPI\_Recv 进行通信。但测试中发现，当 MIG\_M = 3 时，发送方和接收方的 MPI 内部缓冲区可能同时达到饱和，导致死锁——发送操作阻塞等待接收缓冲区释放，而接收操作阻塞等待发送完成。解决这一问题有两种途径：一是使用 MPI\_Sendrecv 替代单独的 Send 和 Recv，二是使用非阻塞通信 MPI\_Isend / MPI\_Irecv。本实现选择 MPI\_Sendrecv，因为它以单一函数调用的方式同时处理发送和接收，由 MPI 实现内部协调缓冲区的使用，代码简洁且不易出错。
+
+\subsubsection{算法伪码}
+
+\begin{lstlisting}[language={},basicstyle=\scriptsize\fontspec{DejaVu Sans Mono}]
+Algorithm 3: HdEA-MP (Ring Migration)
+  POP_ISLAND ← 50, MAX_GEN ← 200000
+  MIG_FREQ ← 20, MIG_M ← 3
+  初始化本地子种群 pop[POP_ISLAND]
+  for gen = 1 to MAX_GEN do
+      // 本地进化
+      pop ← SelectionCrossoverMutation(pop)
+      
+      if gen mod MIG_FREQ == 0 then
+          // 第1层：精英迁移（同 HdEA）
+          MPI_Gather(local_best, 0, MPI_COMM_WORLD)
+          if rank == 0 then 更新全局精英池 end if
+          MPI_Bcast(global_elite, 0, MPI_COMM_WORLD)
+          
+          // 第2层：环形迁移
+          sendTo ← (rank + 1) mod 4
+          recvFrom ← (rank - 1 + 4) mod 4
+          打包 MIG_M 个最优个体至 sendBuf
+          MPI_Sendrecv(sendBuf, sendTo, recvBuf, recvFrom)
+          用 recvBuf 中的更优个体替换本地最差个体
+      end if
+  end for
+\end{lstlisting}
+
+\subsubsection{与 HdEA 的本质区别}
+
+HdEA-MP 比 HdEA 多出的一层环形迁移带来两个重要变化：（1）迁移量从 HdEA 的每个岛屿仅贡献一个精英个体变为每个岛屿交换三个个体，基因交流的密度大幅提高；（2）迁移发生在岛屿之间（直接点对点），而非通过 Master 中转，因此环形迁移可以在不增加 Master 负担的情况下进行。然而，这种密集迁移也是一把双刃剑——如果迁移频率过高或迁移量过大，各岛屿的种群将被强制拉近，丧失探索差异区域的能力。
