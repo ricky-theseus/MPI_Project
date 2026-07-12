@@ -1,5 +1,3 @@
-# dEA  pcb442  pop=100  maxGen=200000  procs=1
-# Run	Best	Time(s)
 1	51645	95.47
 2	51682	103.66
 3	51296	35.49

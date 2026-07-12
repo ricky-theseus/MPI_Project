@@ -1,5 +1,3 @@
-# HdEA-MP  pcb442  islands=4  core=50  mig=50  maxGen=200000
-# Run	Best	Time(s)
 1	51653	128.80
 2	52272	134.27
 3	52185	133.35

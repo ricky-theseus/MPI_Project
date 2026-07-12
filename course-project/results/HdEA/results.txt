@@ -1,5 +1,3 @@
-# HdEA  pcb442  islands=4  pop/island=100  maxGen=200000
-# Run	Best	Time(s)
 1	51877	67.80
 2	51787	70.16
 3	51484	80.81

@@ -100,11 +100,11 @@ int main(int argc, char **argv)
         resFile = fopen("results_dEA.txt", "w");
         if (resFile) {
             fprintf(resFile, "# dEA  pcb442  pop=%d  maxGen=%ld  procs=%d\n", xColony, maxGen, size);
-            fprintf(resFile, "# Run\\tBest\\tTime(s)\\n");
+            fprintf(resFile, "# Run\tBest\tTime(s)\n");
         }
         convFile = fopen("convergence_dEA.txt", "w");
         if (convFile)
-            fprintf(convFile, "# Gen\\tTime\\tBest\\n");
+            fprintf(convFile, "# Gen\tTime\tBest\n");
     }
 
     // ---- multi-run ----

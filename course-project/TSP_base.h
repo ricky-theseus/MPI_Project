@@ -147,77 +147,63 @@ static double best_distance(double dis[], int ps)
 
 static void mapping_operator(int colony[][CITY], double dis[], int popSize)
 {
-    int b = best_idx(dis, popSize);
-    int w = worst_idx(dis, popSize);
-    if (b == w) {
-        w = (w + 1) % popSize;
-    }
+    int a = rand() % popSize;
+    int b = rand() % popSize;
+    while (b == a) b = rand() % popSize;
+
+    if (dis[a] < dis[b]) { int t = a; a = b; b = t; }
 
     int start = rand() % xCity;
-    int len = rand() % (xCity / 3) + 1;
-    int end = (start + len) % xCity;
+    int len = (rand() % (xCity / 2)) + 1;
 
-    int segLen;
-    int segB[CITY], segW[CITY];
-    if (start < end) {
-        segLen = end - start + 1;
-        for (int i = 0; i < segLen; i++) segB[i] = colony[b][start + i];
-    } else {
-        segLen = (xCity - start) + end + 1;
-        for (int i = 0; i < xCity - start; i++) segB[i] = colony[b][start + i];
-        for (int i = 0; i <= end; i++) segB[xCity - start + i] = colony[b][i];
-    }
-
-    int used[CITY];
-    int newTour[CITY];
-    for (int j = 0; j < xCity; j++) used[j] = 0;
-
-    int firstCity = segB[0];
+    int firstCity = colony[a][start];
     int bPos = position(colony[b], firstCity);
-    int wPos = position(colony[w], firstCity);
-    int wStart = rand() % xCity;
 
-    int wSegPos = -1;
-    for (int offset = 0; offset < xCity; offset++) {
-        int p = (wStart + offset) % xCity;
-        int q = (p + segLen - 1) % xCity;
-        if (q == position(colony[w], colony[b][start])) {
-            wSegPos = p;
-            break;
-        }
-    }
-    if (wSegPos < 0) wSegPos = (wStart - segLen + xCity) % xCity;
+    int newTour[CITY];
+    int used[CITY] = {0};
 
-    for (int i = 0; i < xCity; i++) {
-        if (i < segLen) {
-            newTour[i] = colony[b][(start + i) % xCity];
-        } else {
-            newTour[i] = colony[w][(wSegPos + i) % xCity];
-        }
+    for (int i = 0; i < len; i++) {
+        int p = (start + i) % xCity;
+        newTour[p] = colony[b][(bPos + i) % xCity];
+        used[newTour[p]] = 1;
     }
 
-    for (int i = 0; i < xCity; i++) used[newTour[i]]++;
+    int pmxSrc[CITY], pmxDst[CITY];
+    for (int i = 0; i < len; i++) {
+        pmxSrc[i] = colony[a][(start + i) % xCity];
+        pmxDst[i] = colony[b][(bPos + i) % xCity];
+    }
 
     for (int i = 0; i < xCity; i++) {
-        if (used[colony[b][i]] == 0) {
-            for (int j = 0; j < xCity; j++) {
-                if (used[colony[w][j]] > 1) {
-                    used[colony[w][j]]--;
-                    used[colony[b][i]]++;
-                    for (int k = 0; k < xCity; k++) {
-                        if (newTour[k] == colony[w][j]) {
-                            newTour[k] = colony[b][i];
-                            break;
-                        }
-                    }
-                    break;
+        int inSeg = 0;
+        for (int j = 0; j < len; j++) {
+            if ((start + j) % xCity == i) { inSeg = 1; break; }
+        }
+        if (inSeg) continue;
+
+        int city = colony[a][i];
+        int dup = used[city] ? 1 : 0;
+
+        if (dup) {
+            for (int k = 0; k < len; k++) {
+                if (city == pmxDst[k]) {
+                    city = pmxSrc[k];
+                    if (!used[city]) { dup = 0; break; }
+                }
+            }
+            if (dup) {
+                for (int j = 0; j < xCity; j++) {
+                    if (!used[j]) { city = j; break; }
                 }
             }
         }
+
+        newTour[i] = city;
+        used[city] = 1;
     }
 
-    memcpy(colony[w], newTour, xCity * sizeof(int));
-    dis[w] = tour_distance(colony[w]);
+    memcpy(colony[a], newTour, xCity * sizeof(int));
+    dis[a] = tour_distance(colony[a]);
 }
 
 static void sort_by_fitness(int colony[][CITY], double dis[], int ps)
@@ -242,24 +228,20 @@ static void log_convergence(FILE *fp, long gen, double elapsed, double best)
     fprintf(fp, "%ld\t%.4f\t%.0f\n", gen, elapsed, best);
 }
 
-static void check_critical_velocity(long prevCheckGen, long currGen,
-    double prevBest, double currBest, double elapsed,
-    int colony[][CITY], double dis[], int popSize,
-    long *outPrevCheckGen, double *outPrevBest)
+static double update_mutation_rate(double p, long gen, long maxGen)
 {
-    long diff = currGen - prevCheckGen;
-    if (diff >= 2000) {
-        double velocity = (currBest - prevBest) / elapsed;
-        if (velocity > -0.001 || velocity == 0) {
-            velocity = 0;
-        }
-        if (currBest >= prevBest || (prevBest - currBest) < 5000) {
-            if ((rand() / 32768.0) < 0.05)
-                mapping_operator(colony, dis, popSize);
-        }
-        *outPrevCheckGen = currGen;
-        *outPrevBest = currBest;
-    }
+    double factor = 1.0 - ((double)gen / (double)maxGen) * 0.01;
+    return p * factor;
+}
+
+static void check_critical_velocity(double prevBest, double currBest,
+    double elapsed, int colony[][CITY], double dis[], int popSize,
+    double *outPrevBest)
+{
+    double velocity = (prevBest - currBest) / (elapsed > 0 ? elapsed : 1.0);
+    if (velocity < 5000.0 && (rand() / 32768.0) < 0.05)
+        mapping_operator(colony, dis, popSize);
+    *outPrevBest = currBest;
 }
 
 #endif
