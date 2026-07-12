@@ -228,11 +228,13 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD, &np);
 
     const char *tspFile = "pcb442.tsp";
+    const char *outDir = ".";
     int numRuns = 30;
     long maxGen = 4000;
     if (argc > 1) tspFile = argv[1];
     if (argc > 2) numRuns = atoi(argv[2]);
     if (argc > 3) maxGen = atol(argv[3]);
+    if (argc > 4) outDir = argv[4];
 
     double **city_dis = (double **)malloc(MAX_CITY * sizeof(double *));
     for (int i = 0; i < MAX_CITY; i++)
@@ -271,13 +273,13 @@ int main(int argc, char **argv)
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    char resFile[256];
-    snprintf(resFile, sizeof(resFile), "results_dEA_island.txt");
-
+    char resFile[256], convFile[256];
+    snprintf(resFile, sizeof(resFile), "%s/results.txt", outDir);
     if (rank == 0) {
         printf("dEA Island Model | %s | %d cities | %d islands | "
-               "%d pop/island | mig=%d gen | maxGen=%ld | %d runs\n",
-               tspFile, xCity, np, POP_SIZE, MIG_INTERVAL, maxGen, numRuns);
+               "%d pop/island | mig=%d gen | maxGen=%ld | %d runs | out=%s\n",
+               tspFile, xCity, np, POP_SIZE, MIG_INTERVAL, maxGen,
+               numRuns, outDir);
     }
 
     for (int run = 0; run < numRuns; run++) {
@@ -291,6 +293,13 @@ int main(int argc, char **argv)
         int prev = (rank - 1 + np) % np;
         int tourBuffer[MAX_CITY];
         long lastImproveGen = 0;
+
+        FILE *convFp = NULL;
+        if (rank == 0) {
+            snprintf(convFile, sizeof(convFile), "%s/run_%d_conv.txt",
+                     outDir, run);
+            convFp = fopen(convFile, "w");
+        }
 
         for (long gen = 0; gen < maxGen; gen++) {
             probab1 = probab1_init *
@@ -321,10 +330,14 @@ int main(int argc, char **argv)
                 dis[worst] = tour_distance(colony[worst], city_dis);
             }
 
-            if (gen % LOG_INTERVAL == 0 && rank == 0)
+            if (gen % LOG_INTERVAL == 0 && rank == 0) {
+                double ela = MPI_Wtime() - runStart;
+                fprintf(convFp, "%ld\t%.0f\t%.2f\n", gen, currBest, ela);
                 printf("[%s] run=%d gen=%ld best=%.0f\n",
                        tspFile, run, gen, currBest);
+            }
         }
+        if (rank == 0 && convFp) fclose(convFp);
 
         double localBest = dis[best_idx(dis, POP_SIZE)];
         double globalBest;

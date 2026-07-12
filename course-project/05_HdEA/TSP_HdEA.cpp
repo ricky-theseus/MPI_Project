@@ -361,6 +361,8 @@ int main(int argc, char **argv)
     if (argc > 4) numRuns = atoi(argv[4]);
     if (argc > 5) migInterval = atol(argv[5]);
     if (argc > 6) variant = atoi(argv[6]);
+    const char *outDir = ".";
+    if (argc > 7) outDir = argv[7];
 
     if (M * N != np) {
         if (rank == 0)
@@ -421,14 +423,15 @@ int main(int argc, char **argv)
         ? varNames[variant] : "Unknown";
 
     char resFile[256];
-    snprintf(resFile, sizeof(resFile), "results_HdEA_%s.txt", vName);
+    snprintf(resFile, sizeof(resFile), "%s/results.txt", outDir);
 
     if (rank == 0) {
         printf("HdEA %s | %s | %d cities | %d procs (M=%d,N=%d) "
                "| pop=%d | localMig=%ld | ratio=%d:1 | globalRounds=%d | "
-               "totalGen=%ld | %d runs\n",
+               "totalGen=%ld | %d runs | out=%s\n",
                vName, tspFile, xCity, np, M, N, POP_SIZE,
-               migInterval, LOCAL_RATIO, GLOBAL_ROUNDS, totalGen, numRuns);
+               migInterval, LOCAL_RATIO, GLOBAL_ROUNDS, totalGen,
+               numRuns, outDir);
     }
 
     for (int run = 0; run < numRuns; run++) {
@@ -445,6 +448,13 @@ int main(int argc, char **argv)
         int localNext = myGroup * N + (myPos + 1) % N;
         int localPrev = myGroup * N + (myPos - 1 + N) % N;
         int tourBuffer[MAX_CITY];
+        char convFile[256];
+        FILE *convFp = NULL;
+        if (rank == 0) {
+            snprintf(convFile, sizeof(convFile), "%s/run_%d_conv.txt",
+                     outDir, run);
+            convFp = fopen(convFile, "w");
+        }
 
         for (long gen = 0;
              gen <= totalGen && globalMigCount < GLOBAL_ROUNDS; gen++) {
@@ -504,10 +514,16 @@ int main(int argc, char **argv)
                 }
             }
 
-            if (gen % LOG_INTERVAL == 0 && rank == 0)
+            if (gen % LOG_INTERVAL == 0 && rank == 0) {
+                double ela = MPI_Wtime() - runStart;
+                if (convFp)
+                    fprintf(convFp, "%ld\t%.0f\t%.2f\t%ld\n",
+                            gen, currBest, ela, globalMigCount);
                 printf("[%s:%s] run=%d gen=%ld best=%.0f glob=%ld\n",
                        tspFile, vName, run, gen, currBest, globalMigCount);
+            }
         }
+        if (rank == 0 && convFp) fclose(convFp);
 
         double localBest = dis[best_idx(dis, POP_SIZE)];
         double globalBest;
