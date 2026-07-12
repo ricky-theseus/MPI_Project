@@ -1,0 +1,20 @@
+======================================================================
+dEA vs HdEA Experiment Report
+Instance: pcb442 (optimal=50778)
+Interval: interval_50
+
+Algorithm                       Mean        Std       Best    Time(s)  #Runs
+-----------------------------------------------------------------------
+dEA                          51443.6      133.2    51156.0      374.0     10
+HdEA_RingIndividual          51071.9       74.7    50984.0       89.1     10
+HdEA_RingColony              51080.6       62.5    50996.0       89.3     10
+
+--- t-test Results (p < 0.05 = significant) ---
+
+  dEA vs HdEA_RingIndividual: p=0.0000 (SIGNIFICANT)
+  dEA vs HdEA_RingColony: p=0.0000 (SIGNIFICANT)
+  HdEA_RingIndividual vs HdEA_RingColony: p=0.0789 (not sig)
+
+Significant differences:
+  HdEA_RingIndividual > dEA (p=0.0000)
+  HdEA_RingColony > dEA (p=0.0000)
