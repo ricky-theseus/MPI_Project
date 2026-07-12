@@ -5,6 +5,6 @@ if %ERRORLEVEL% NEQ 0 (echo vcvars failed & pause & exit /b 1)
 set INC=C:\Program Files (x86)\Microsoft SDKs\MPI\Include
 set LIBP=C:\Program Files (x86)\Microsoft SDKs\MPI\Lib\x64
 
-echo === Building HdEA Ring Individual ===
-cl /EHsc /I"%INC%" /O2 "%~dp0TSP_HdEA_ring.cpp" /Fe"%~dp0TSP_HdEA_ring.exe" /link /LIBPATH:"%LIBP%" msmpi.lib
+echo === Building HdEA (4 variants) ===
+cl /EHsc /I"%INC%" /O2 "%~dp0TSP_HdEA.cpp" /Fe"%~dp0TSP_HdEA.exe" /link /LIBPATH:"%LIBP%" msmpi.lib
 if %ERRORLEVEL% EQU 0 (echo BUILD SUCCESS) else (echo BUILD FAILED & pause)
