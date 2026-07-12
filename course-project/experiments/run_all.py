@@ -73,8 +73,8 @@ def main():
     parser.add_argument("--algorithms", default="all")
     parser.add_argument("--mode", default="tiny", choices=["tiny", "quick", "paper"])
     parser.add_argument("--runs", type=int, default=10)
-    parser.add_argument("--procs", type=int, default=4)
-    parser.add_argument("--intervals", default="")
+    parser.add_argument("--procs", type=int, default=64)
+    parser.add_argument("--intervals", default="100")
     args = parser.parse_args()
 
     scale = SCALE[args.mode]
