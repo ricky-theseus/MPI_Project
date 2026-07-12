@@ -1,0 +1,4 @@
+run	best	elapsed	globalMigs
+0	51332	24.25	99
+run	best	elapsed	globalMigs
+0	51498	33.05	100
