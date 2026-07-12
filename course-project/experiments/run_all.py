@@ -69,12 +69,19 @@ def get_group_layout(procs):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--instances", default="pcb442")
-    parser.add_argument("--algorithms", default="all")
-    parser.add_argument("--mode", default="tiny", choices=["tiny", "quick", "paper"])
-    parser.add_argument("--runs", type=int, default=10)
-    parser.add_argument("--procs", type=int, default=64)
-    parser.add_argument("--intervals", default="100")
+    parser.add_argument("--instances", default="pcb442",
+                        help="comma-separated instance names (default pcb442)")
+    parser.add_argument("--algorithms", default="dEA,HdEA_RingIndividual,HdEA_RingColony",
+                        help="algorithms: dEA, HdEA_RingIndividual, HdEA_RingColony (default 3)")
+    parser.add_argument("--mode", default="tiny",
+                        choices=["tiny", "quick", "paper"],
+                        help="scale mode: tiny/quick/paper (ignored when --intervals set)")
+    parser.add_argument("--runs", type=int, default=10,
+                        help="independent runs per combination (default 10)")
+    parser.add_argument("--procs", type=int, default=64,
+                        help="MPI processes (default 64, must be M×N)")
+    parser.add_argument("--intervals", default="100",
+                        help="migration interval(s), comma-separated")
     args = parser.parse_args()
 
     scale = SCALE[args.mode]

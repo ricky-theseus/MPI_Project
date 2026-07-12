@@ -30,16 +30,13 @@ except ImportError:
     print("WARNING: matplotlib not installed. Install: pip install matplotlib")
 
 
-ALG_ORDER = ["dEA", "HdEA_RingIndividual", "HdEA_RandomIndividual",
-             "HdEA_RingColony", "HdEA_RandomColony"]
-ALG_LABELS = {"dEA": "dEA", "HdEA_RingIndividual": "HdEA RingIndiv",
-              "HdEA_RandomIndividual": "HdEA RandIndiv",
-              "HdEA_RingColony": "HdEA RingColony",
-              "HdEA_RandomColony": "HdEA RandColony"}
-COLORS = {"dEA": "#3498db", "HdEA_RingIndividual": "#2ecc71",
-          "HdEA_RandomIndividual": "#e74c3c",
-          "HdEA_RingColony": "#9b59b6",
-          "HdEA_RandomColony": "#f39c12"}
+ALG_ORDER = ["dEA", "HdEA_RingIndividual", "HdEA_RingColony"]
+ALG_LABELS = {"dEA": "dEA",
+              "HdEA_RingIndividual": "HdEA RingIndiv",
+              "HdEA_RingColony": "HdEA RingColony (MP)"}
+COLORS = {"dEA": "#3498db",
+          "HdEA_RingIndividual": "#2ecc71",
+          "HdEA_RingColony": "#e74c3c"}
 OPTIMAL = {
     "lin318": 42029, "pcb442": 50778, "u574": 36905, "p654": 34643,
     "d657": 48912, "u724": 41910, "rat783": 8806,
