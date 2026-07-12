@@ -1,2 +1,0 @@
-run	best	elapsed	globalMigs
-0	51521	28.64	100
