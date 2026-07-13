@@ -1,0 +1,9 @@
+timestamp: 20260713_231152
+instances: ['pcb442']
+algorithms: ['dEA', 'HdEA_RingIndividual', 'HdEA_RingColony']
+processes: 4 (M=2, N=2)
+runs_per_combo: 2
+intervals: [100]
+population_size: 100
+local_ratio: 20 (local:global migration, HdEA only)
+data_source: D:\MPI_Project\course-project\tsp_instances
