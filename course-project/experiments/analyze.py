@@ -113,13 +113,9 @@ def t_test(a, b):
     return t, p
 
 
-def collect_data(output_base, instance):
-    """Collect all data for one instance across all intervals and algorithms."""
-    inst_dir = os.path.join(output_base, instance)
-    if not os.path.exists(inst_dir):
-        return {}
-
-    interval_dirs = sorted(glob.glob(os.path.join(inst_dir, "interval_*")))
+def collect_data_from_run(run_dir, instance):
+    """Collect all data from a timestamped experiment run directory."""
+    interval_dirs = sorted(glob.glob(os.path.join(run_dir, "interval_*")))
     data = {}
     for intv_dir in interval_dirs:
         intv_name = os.path.basename(intv_dir)
@@ -369,7 +365,8 @@ def write_report(data, opt, out_dir):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--instance", default="pcb442")
+    parser.add_argument("--dir", default="",
+                        help="experiment directory (default: auto-detect latest)")
     parser.add_argument("--output-base",
                         default=os.path.join(
                             os.path.dirname(os.path.dirname(__file__)),
@@ -377,18 +374,39 @@ def main():
     args = parser.parse_args()
 
     output_base = os.path.abspath(args.output_base)
-    instance = args.instance
+
+    if args.dir:
+        run_dir = args.dir
+    else:
+        dirs = sorted([d for d in os.listdir(output_base)
+                       if os.path.isdir(os.path.join(output_base, d))
+                       and d.startswith("run_")])
+        if not dirs:
+            print("ERROR: No experiment runs found.")
+            print(f"Run: python experiments/run_all.py")
+            return 1
+        run_dir = os.path.join(output_base, dirs[-1])
+
+    print(f"Analyzing: {os.path.basename(run_dir)}")
+    print(f"Data dir: {run_dir}")
+
+    # Read params
+    params_path = os.path.join(run_dir, "params.txt")
+    instance = "pcb442"
+    intervals = []
+    if os.path.exists(params_path):
+        with open(params_path) as f:
+            for line in f:
+                if line.startswith("instances:"):
+                    instance = line.split(":")[1].strip()
     opt = OPTIMAL.get(instance)
 
-    print(f"Analyzing: {instance} (optimal={opt})")
-    print(f"Data dir: {output_base}")
-
-    data = collect_data(output_base, instance)
+    data = collect_data_from_run(run_dir, instance)
     if not data:
-        print("ERROR: No data found. Run run_all.py first.")
+        print("ERROR: No data found.")
         return 1
 
-    ana_dir = os.path.join(output_base, instance, "analysis")
+    ana_dir = os.path.join(run_dir, "analysis")
     os.makedirs(ana_dir, exist_ok=True)
 
     plot_convergence(data, opt, ana_dir)
