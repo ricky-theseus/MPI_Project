@@ -1,0 +1,9 @@
+timestamp: 20260714_040026
+instances: ['pcb442']
+algorithms: ['dEA']
+processes: 64 (M=8, N=8)
+runs_per_combo: 10
+intervals: [300]
+population_size: 100
+local_ratio: 20 (local:global migration, HdEA only)
+data_source: D:\MPI_Project\course-project\tsp_instances

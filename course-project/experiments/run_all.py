@@ -130,7 +130,7 @@ def main():
 
         try:
             r = subprocess.run(cmd, cwd=workdir, capture_output=True,
-                               text=True, timeout=7200)
+                               text=True, timeout=43200)
             elapsed = time.time() - t0
             ok = r.returncode == 0
             status = "OK" if ok else f"FAIL(rc={r.returncode})"
