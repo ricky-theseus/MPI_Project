@@ -13,6 +13,7 @@ import os
 import sys
 import argparse
 import time
+import shutil
 from datetime import datetime
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -82,6 +83,8 @@ def main():
                         help="MPI processes (default 64, must be M×N)")
     parser.add_argument("--intervals", default="100",
                         help="migration interval(s), comma-separated")
+    parser.add_argument("--no-clean", action="store_true",
+                        help="preserve old results (default: clear before run)")
     args = parser.parse_args()
 
     scale = SCALE[args.mode]
@@ -112,7 +115,6 @@ def main():
                     OUTPUT_BASE, inst,
                     f"interval_{intervals[i]}",
                     alg_name)
-                os.makedirs(out_dir, exist_ok=True)
                 jobs.append((alg_name, alg, inst, mig_int, out_dir, M, N))
                 total += 1
 
@@ -124,10 +126,16 @@ def main():
     print(f"  Procs: {args.procs} (M={M}, N={N})")
     print(f"  Runs per combo: {args.runs}")
     print(f"  Total jobs: {total}")
+    print(f"  Clean old: {'NO' if args.no_clean else 'YES (use --no-clean to keep)'}")
     print(f"  Output: {OUTPUT_BASE}")
     print(f"{'='*60}")
 
     for idx, (alg_name, alg, inst, mig_int, out_dir, M, N) in enumerate(jobs):
+        if not args.no_clean:
+            if os.path.exists(out_dir):
+                print(f"  Cleaning old: {out_dir}")
+                shutil.rmtree(out_dir)
+            os.makedirs(out_dir, exist_ok=True)
         tsp_path = os.path.join(tsp_dir, f"{inst}.tsp")
         exe_path = os.path.join(PROJECT_DIR, alg["dir"], alg["exe"])
         workdir = os.path.join(PROJECT_DIR, alg["dir"])
