@@ -4,6 +4,10 @@
 #include <iostream>
 #include <vector>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 void my_MPI_Allgather(const void* sendbuf, int sendcount, MPI_Datatype sendtype,
                       void* recvbuf, int recvcount, MPI_Datatype recvtype,
                       MPI_Comm comm) {
@@ -37,6 +41,10 @@ int main(int argc, char** argv) {
     int rank = 0, size = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+#endif
 
     // Each process holds a segment of the name+ID string
     constexpr int MAX_SEG = 20;
