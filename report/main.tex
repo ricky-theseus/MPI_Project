@@ -42,27 +42,32 @@
     urlcolor=blue,
 }
 
-\title{
-    \includegraphics[width=7cm]{emblem.png}\\[0.8cm]
-    {\heiti\zihao{2}
-     基于 MPI 的并行分布计算课程报告\\[0.3cm]
-     ——分层分布式进化算法求解 TSP}
-}
-\author{\kaishu\zihao{4}
-    \vspace{1.5cm}
-    \begin{tabular}{rl@{\qquad}rl}
-    姓名：& \underline{ 任天翌 } &
-    班级：& \underline{ 191232 } \\[0.5cm]
-    学号：& \underline{ 20231003512 } &
-    日期：& \underline{ 2026 年 7 月}
-    \end{tabular}
-}
-\date{}
+\newcommand{\underlinefill}{\underline{\hspace{6cm}}}
 
 \begin{document}
 
-\maketitle
+\begin{titlepage}
 \thispagestyle{empty}
+\vspace*{2cm}
+\begin{center}
+{\bfseries\zihao{2} 并行计算课程报告}
+
+\vspace{1.5cm}
+
+\includegraphics[width=7cm]{emblem2.jpeg}
+
+\vspace{2cm}
+
+\begin{tabular}{r@{\hspace{0.5cm}}l}
+班级：     & \underlinefill \\[0.8cm]
+学生姓名： & \underlinefill \\[0.8cm]
+学号：     & \underlinefill \\[0.8cm]
+专业：     & \underlinefill \\[0.8cm]
+学院：     & \underlinefill \\[0.8cm]
+日期：     & \underlinefill
+\end{tabular}
+\end{center}
+\end{titlepage}
 
 % ---- 摘要（紧跟封面，罗马数字页码）----
 \pagenumbering{Roman}
