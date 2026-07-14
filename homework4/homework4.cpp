@@ -34,6 +34,8 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+    std::cout << "姓名: 任天翌  学号: 20231003512\n";
+
     constexpr int N = 4;
     int sendbuf = rank + 1;
 

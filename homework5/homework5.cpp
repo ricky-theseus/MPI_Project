@@ -38,6 +38,8 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+    std::cout << "姓名: 任天翌  学号: 20231003512\n";
+
     int sendval = rank + 1;
 
     std::cout << "Rank " << rank << " contributes: " << sendval << "\n";
