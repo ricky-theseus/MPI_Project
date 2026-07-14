@@ -34,47 +34,56 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    std::cout << "姓名: 任天翌  学号: 20231003512\n";
+    // Each process holds a segment of the name+ID string
+    constexpr int MAX_SEG = 20;
+    const char* segments[] = {
+        "姓名: 任天",
+        "\xE7\xBF\x8E  学号",    // "翌  学号"
+        ": 20231003",
+        "512"
+    };
+    char myseg[MAX_SEG] = {};
+    strncpy(myseg, segments[rank], MAX_SEG - 1);
 
-    constexpr int N = 4;
-    int sendbuf = rank + 1;
+    std::cout << "Rank " << rank << " holds: [" << myseg << "]\n";
 
-    std::cout << "Rank " << rank << " sendbuf = " << sendbuf << "\n";
+    // Use my_MPI_Gather to collect all segments at root
+    std::vector<char> full(MAX_SEG * size);
+    my_MPI_Gather(myseg, MAX_SEG, MPI_CHAR,
+                  full.data(), MAX_SEG, MPI_CHAR,
+                  0, MPI_COMM_WORLD);
 
-    std::vector<int> recvbuf;
     if (rank == 0) {
-        recvbuf.resize(size);
+        std::cout << "\n--- my_MPI_Gather: distributed concatenation ---\n";
+        for (int i = 0; i < size; ++i)
+            std::cout << (full.data() + i * MAX_SEG);
+        std::cout << "\n";
     }
+
+    // Validation with standard MPI_Gather (int version)
+    int sendbuf = rank + 1;
+    std::vector<int> recvbuf;
+    if (rank == 0) recvbuf.resize(size);
 
     my_MPI_Gather(&sendbuf, 1, MPI_INT,
                   recvbuf.data(), 1, MPI_INT,
                   0, MPI_COMM_WORLD);
 
     if (rank == 0) {
-        std::cout << "\n--- my_MPI_Gather result ---\n";
-        for (int i = 0; i < size; ++i) {
-            std::cout << "  from rank " << i << " -> recvbuf[" << i << "] = " << recvbuf[i] << "\n";
-        }
-
-        std::vector<int> expected;
-        expected.resize(size);
+        std::cout << "\n--- standard MPI_Gather validation ---\n";
+        std::vector<int> expected(size);
         MPI_Gather(&sendbuf, 1, MPI_INT,
                    expected.data(), 1, MPI_INT,
                    0, MPI_COMM_WORLD);
-
         bool ok = true;
         for (int i = 0; i < size; ++i) {
-            if (recvbuf[i] != expected[i]) {
-                ok = false;
-                break;
-            }
+            if (recvbuf[i] != expected[i]) { ok = false; break; }
         }
-        std::cout << "\n--- Comparison ---\n";
         std::cout << "  my_MPI_Gather: ";
         for (int v : recvbuf) std::cout << v << " ";
         std::cout << "\n  MPI_Gather:    ";
         for (int v : expected) std::cout << v << " ";
-        std::cout << "\n  => " << (ok ? "PASS: results match\n" : "FAIL: mismatch\n");
+        std::cout << "\n  => " << (ok ? "PASS\n" : "FAIL\n");
     } else {
         MPI_Gather(&sendbuf, 1, MPI_INT,
                    nullptr, 1, MPI_INT,
