@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     constexpr int MAX_SEG = 20;
     const char* segments[] = {
         "姓名: 任天",
-        "\xE7\xBF\x8E  学号",    // "翌  学号"
+        "\xE7\xBF\x8C  学号",    // "翌  学号"
         ": 20231003",
         "512"
     };
