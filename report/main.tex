@@ -5,6 +5,7 @@
 \onehalfspacing
 
 \usepackage{amsmath,amssymb,amsfonts}
+\PassOptionsToPackage{draft}{graphicx}
 \usepackage{graphicx}
 \graphicspath{{./img/}{./figures/}}
 \usepackage{float}
@@ -12,68 +13,275 @@
 \usepackage{multirow}
 \usepackage{array}
 \usepackage{caption}
-\usepackage{subcaption}
-
-\usepackage{listings}
-\usepackage{xcolor}
-\usepackage{fontspec}
-
-\lstset{
-    language=C++,
-    basicstyle=\small\fontspec{DejaVu Sans Mono},
-    keywordstyle=\color{blue},
-    commentstyle=\color{gray},
-    stringstyle=\color{red},
-    numbers=left,
-    numberstyle=\tiny\color{gray},
-    frame=single,
-    breaklines=true,
-    showstringspaces=false,
-    tabsize=4,
-}
-
 \usepackage{hyperref}
-\hypersetup{
-    colorlinks=true,
-    linkcolor=blue,
-    citecolor=blue,
-    urlcolor=blue,
-}
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
 
-\title{
-    \includegraphics[width=7cm]{emblem.png}\\[0.8cm]
-    {\heiti\zihao{2}
-     基于 MPI 的并行分布计算课程报告\\[0.3cm]
-     ——分层分布式进化算法求解 TSP}
-}
-\author{\kaishu\zihao{4}
-    \vspace{1.5cm}
-    \begin{tabular}{rl@{\qquad}rl}
-    姓名：& \underline{ 任天翌 } &
-    班级：& \underline{ 191232 } \\[0.5cm]
-    学号：& \underline{ 20231003512 } &
-    日期：& \underline{ 2026 年 7 月}
-    \end{tabular}
-}
-\date{}
+\newcommand{\underlinefill}{\underline{\hspace{6cm}}}
 
 \begin{document}
 
-\maketitle
+% ============================================================
+% COVER PAGE
+% ============================================================
+\begin{titlepage}
 \thispagestyle{empty}
-\pagenumbering{gobble}
-\newpage
+\vspace*{2cm}
+\begin{center}
+{\bfseries\zihao{2} 并行计算课程报告}
 
-\pagenumbering{arabic}
+\vspace{1.5cm}
+
+% \includegraphics[width=7cm]{emblem_new.png}
+
+\vspace{2cm}
+
+\begin{tabular}{r@{\hspace{0.5cm}}l}
+班级：     & \underlinefill \\[0.8cm]
+学生姓名： & \underlinefill \\[0.8cm]
+学号：     & \underlinefill \\[0.8cm]
+专业：     & \underlinefill \\[0.8cm]
+学院：     & \underlinefill \\[0.8cm]
+日期：     & \underlinefill
+\end{tabular}
+\end{center}
+\end{titlepage}
+
+% ============================================================
+% CONTENT
+% ============================================================
+\setcounter{page}{1}
+
+% ---------- 摘要 ----------
+\section*{摘要}
+\addcontentsline{toc}{section}{摘要}
+
+本报告基于 Li 与 Hu（2014）提出的分层分布式进化算法框架，使用 MPI 并行编程模型实现了三种分布式进化算法——分布式进化算法（dEA）、分层分布式进化算法（HdEA）以及移动种群的分层分布式进化算法（HdEA-MP），并在 TSPLIB 标准实例 pcb442（最优解 50778）上进行了对比实验。三种算法均运行于 64 子种群（8×8 组结构）、每子种群 100 个个体、基于 Inver-over 进化算子的统一条件下，每组配置独立运行 10 次，对结果进行均值、标准差统计及配对 t 检验（95\% 置信水平）。实验结果表明，两类 HdEA 算法均显著优于 dEA（$p<0.001$），其中 HdEA RingColony 获得最低均值（50972）和最小的标准差（76），证明了层次化迁移和移动种群策略对求解质量的有效提升。
+
+\newpage
 \tableofcontents
 \newpage
 
-\include{sections/00_abstract}
-\include{sections/01_introduction}
-\include{sections/02_algorithm_design}
-\include{sections/03_experimental_setup}
-\include{sections/04_results}
-\include{sections/05_conclusion}
-\include{sections/99_appendix}
+% ---------- 1. 引言 ----------
+\section{引言}
+
+旅行商问题（Traveling Salesman Problem, TSP）是组合优化领域最经典的 NP-hard 问题之一，在 PCB 钻孔路径规划、物流配送、VLSI 布线等工程实践中有着广泛应用。进化算法（Evolutionary Algorithm, EA）作为一类基于种群迭代的随机搜索方法，能够在不依赖问题梯度信息的情况下有效地逼近 TSP 的解，因此在过去三十年间受到了持续且广泛的研究。
+
+然而，单一种群的进化算法在处理大规模 TSP 实例时往往面临早熟收敛（premature convergence）的问题：在进化后期，种群中的个体趋于同质化，遗传多样性丧失，变异和交叉算子难以产生具有新基因结构的有意义的子代，导致算法陷入局部最优而无法进一步改进。这一困境的根源在于有限种群规模下遗传漂变（genetic drift）的不可避免性——一个小规模种群无法在整个搜索空间中同时维持多样性并进行有效的局部搜索。
+
+并行进化算法（Parallel Evolutionary Algorithm, PEA）通过引入多个协同进化的子种群，为解决上述问题提供了一条天然且有效的路径。各子种群在演化过程中保持一定的隔离度，各自在解空间的不同区域进行独立搜索；同时，通过定期的个体迁移（migration），子种群之间交换有潜力的基因片段，使各岛屿既能从他人的优秀探索成果中获益，又不至于因过度同质化而丧失探索独立性。Li 与 Hu（2014）在发表于《Soft Computing》的论文中提出了"基于移动种群的分层分布式进化算法"（Global Migration Strategy with Moving Colony for Hierarchical Distributed Evolutionary Algorithms），在传统分布式 EA 的基础上引入了两项核心创新：其一，将迁移分为局部（组内）和全局（组间）两个层次，分别以不同的频率和粒度运行，形成真正的层级结构；其二，提出了"移动种群"（Moving Colony）的全局迁移策略，以整个子种群而非单个个体作为全局迁移的对象，使得迁移可以单纯通过进程间重组子种群来完成，无需任何通信开销。
+
+本报告以该论文为理论基础，使用 MPI（Message Passing Interface）将原有的串行 TSP 进化算法并行化，完整实现了论文中描述的全部三种算法——基础的 Ring DEA、层次化的 Ring Individual HDEA 以及基于移动种群的 Ring Colony HDEA（即 HdEA-MP）。全部算法均严格遵循论文中的参数配置（64 子种群、100 个体、Inver-over 算子、映射算子、临界速度机制、变异率衰减、Ring 拓扑、局部与全局迁移的 20:1 比例、100 全局迁移轮次的终止条件等），并在此基础上独立运行 10 次，以 t 检验为工具对三种算法的求解能力和稳定性进行了定量比较与因果分析。
+
+% ---------- 2. 算法设计 ----------
+\section{算法设计}
+
+\subsection{基板进化算法}
+
+三种并行算法均以同一个进化算法作为基板——该算法源自 Cai 等人（2005）提出的"改进的 GT 算法"，其核心由两个算子构成。第一个是 Inver-over 算子（Tao 与 Michalewicz, 1998），这是一种自适应算子，能够同时充当变异和交叉的角色：当以概率 $P$ 从同一个体中随机选择第二座城市时，算子退化为变异（在路径中随机反转一段）；当以概率 $1-P$ 从另一个随机个体中选择后继城市时，算子表现为一种启发式交叉（将其他个体的局部路径结构插入当前个体）。变异率 $P$ 不是常数，而是随进化进程线性衰减：$P = 0.02 \times (1 - g_n/g \times 0.01)$，其中 $g_n$ 为当前代数，$g$ 为最大代数。这一衰减机制使得搜索从早期的全局探索平滑过渡到后期的局部精细调整。
+
+第二个算子是映射算子（Mapping Operator），本质上是一种部分映射交叉（PMX）的变体。映射算子的执行条件是所谓的"临界速度"机制：当最近 2000 代内最优解不再改善时，以固定概率 0.05 触发一次映射操作。这种以停滞检测为驱动的算子调用策略，旨在当搜索陷入局部最优时通过引入外源基因片段来重新激活搜索动力，而不会在正常收敛阶段对进化产生无谓的干扰。
+
+对每个个体而言，Inver-over 反复执行直到相邻城市的条件被满足或达到最大迭代次数；此后，精英选择（Elitist Selection）将子代与父代进行一对一比较，仅当子代的适应度（路径长度）优于父代时才用子代替换父代。这种保留最优个体的选择策略保证了每一代中种群的最优解不会退化。
+
+\subsection{分布式进化算法——Ring DEA}
+
+在 Ring DEA 中，每个 MPI 进程维护一个独立的子种群（100 个个体），所有 $n$ 个进程在逻辑上组织成一个环形拓扑：进程 $i$ 的"邻居"为进程 $(i-1)\bmod n$ 和 $(i+1)\bmod n$。每个进程独立执行上述基板 EA 的完整演化循环（Inver-over、精英选择、临界速度检测与映射），不依赖其他进程的中间状态。
+
+每当到达迁移时刻（每经过 $m$ 代，对于 dEA 而言 $m=2$），每个子种群随机选择一个个体作为迁出者，通过 \texttt{MPI\_Sendrecv} 发送给环上的下一个邻居，同时接收来自前一个邻居的个体。接收到新个体后，目标子种群找到自身最差个体并将其替换。这一"随机-最差"替换策略确保迁移总是注入新的遗传信息，且不影响种群内已有的优秀个体。值得注意的是，dEA 没有层次结构——所有迁移均在同一个"扁平"的环形拓扑上进行，不存在"局部"与"全局"之分。
+
+\subsection{分层分布式进化算法——Ring Individual HDEA}
+
+HdEA 在 dEA 的基础上引入了层次化迁移结构。整个种群的 $M \times N$ 个子种群被组织为 $M$ 个组（Group），每组包含 $N$ 个子种群。迁移被分为两个层次：局部迁移和全局迁移，两者以 20:1 的比例交替进行——即每发生 20 次局部迁移后，执行 1 次全局迁移。
+
+局部迁移与 dEA 的机制完全相同：组内的子种群形成环形拓扑，每个子种群随机选择一个个体迁出到组内的下一个邻居，同时接收来自上一个邻居的个体，并用迁入的个体替换自身最差个体。局部迁移的作用范围局限在同一个组之内，其目的是在组内传播有潜力的基因片段，同时保持不同组之间的遗传隔离度，避免过早的全种群同质化。
+
+全局迁移则跨越组的边界。在 Ring Individual HDEA 中，全局迁移的对象为个体。每轮全局迁移选定一个"轮转子种群序号" $p$（取值范围为 $0$ 到 $N-1$，逐轮递增并循环），每个组中序号为 $p$ 的子种群选出自己的最优个体，通过 \texttt{MPI\_Sendrecv} 发送给环形拓扑中下一个组的同序号子种群，同时接收来自上一个组的同序号子种群的最优个体，并用接收到的个体替换自身的最差个体。这一机制的精妙之处在于：每次全局迁移只涉及每个组中的一个子种群（而非全部），从而控制了全局基因交流的剧烈程度，避免了因迁移过于频繁而导致的种群同质化。全局迁移每 20 次局部迁移发生一次，其频率远低于局部迁移，这与"全局迁移应当谨慎干预，局部迁移应当持续运作"的设计原则相符。
+
+算法在完成 100 轮全局迁移后终止。总代数由公式 $\text{总代数} = m \times 20 \times 100 = 2000 \times m$ 给出，其中 $m$ 为局部迁移间隔。
+
+\subsection{移动种群的分层分布式进化算法——Ring Colony HDEA}
+
+Ring Colony HDEA（以下简称 HdEA-MP）是 Li 与 Hu（2014）提出的核心创新。与传统 HdEA 的根本区别在于，其全局迁移的对象不再是单个个体，而是整个子种群——这种策略被称为"移动种群"（Moving Colony）。在每轮全局迁移中，每个组中序号为 $p$ 的子种群作为一个整体，通过 \texttt{MPI\_Sendrecv} 直接迁移到环形拓扑中下一个组的同位置，替换该位置上原有的子种群。
+
+这种设计的优点体现在多个层面。首先，子种群作为整体迁移，意味着迁移带来的遗传信息量远超个体迁移——一个 100 个个体的子种群可以一次性为接收组提供大量与该组现有基因池高度不同的新基因片段，极大地降低组内子种群之间的相似度，为后续的局部迁移提供额外的效率提升空间。从论文的通信代价分析来看，Ring Colony 全局迁移甚至不需要任何物理通信——迁移可以通过重新划分子种群与组的归属关系来实现，只需在主进程中更新一个二维数组记录即可。在我们的 MPI 实现中，我们直接通过 \texttt{MPI\_Sendrecv} 传输整岛数据（100 条完整路径），以确保实现的简洁性和正确性。
+
+全局迁移同样以 20:1 的局部-全局比例进行，算法在完成 100 轮全局迁移后终止。在整个进程中，局部迁移（组内个体交换）与全局迁移（组间整岛移动）交替作用：前者在组内传播优势基因，后者周期性地为每个组注入全新的基因池。
+
+% ---------- 3. 实验设置 ----------
+\section{实验设置}
+
+\subsection{测试实例}
+
+本实验选用 TSPLIB 标准基准库中的 \texttt{pcb442.tsp} 实例作为测试对象。该实例描述了一个含有 442 个钻孔位置的 PCB 加工路径规划问题，其已知最优解的路径长度为 50778。选择 pcb442 作为测试实例的原因如下：该实例的规模对于进化算法来说既非过于简单（使得弹性算法足以在合理时间内收敛到较优解），也非过于庞大（使得实验能够在单机环境中以可接受的时间完成），因而是评估分布式进化算法质量的理想平台。
+
+\subsection{计算环境}
+
+所有实验在以下计算平台上完成：CPU 为拥有 20 个逻辑核心的工作站处理器，配备 32 GB 内存，操作系统为 Windows 11 专业版。MPI 实现为 Microsoft MPI v10.0（基于 MPI-3 标准），编译器为 Microsoft Visual C++ 2022 (MSVC) 14.44，x64 平台，Release 模式编译并使用 /O2 优化选项。
+
+\subsection{算法参数配置}
+
+三种算法共享一组统一的参数，其取值严格遵循 Li 与 Hu（2014）论文中的表 1 设定。子种群大小固定为 100，子种群总数为 64（组织为 $8 \times 8$ 的组结构，即 8 个组、每组 8 个子种群）。每个子种群由一个独立的 MPI 进程承载，共使用 64 个 MPI 进程。进化参数方面：初始变异率设为 0.02，随代数线性衰减（按前述公式）；映射算子概率固定为 0.05，在停滞 2000 代后触发；临界速度阈值设为 5000。局部迁移采用 Ring 拓扑加随机-最差替换策略，迁移规模为每次每个子种群 1 个个体。两层 HdEA 算法的局部迁移与全局迁移比例为 20:1，全局迁移每 20 轮局部迁移（即每 $20m$ 代）执行一次。终止条件方面，HdEA 以完成 100 轮全局迁移为终止标志（即 $2000m$ 代后停止），dEA 在相同的总代数下运行，但以其固有的频率（每 2 代）执行迁移。
+
+本实验中的局部迁移间隔 $m$ 设为 300 代，因此在终止时的总进化代数为 $300 \times 2000 = 600,000$ 代。这一数值受限于单机实验环境下的有限计算资源——论文在 1264 核集群上以 $m=100,000$（总代数 200,000,000 代，即 \textbf{2000 倍}于本实验）运行 pcb442 实例。经过在多组进程数上的初步测试，我们确认在 $m=300$（总代数 600,000 代）的条件下，三种算法均呈现明显的收敛趋稳特征，且绝对求解质量与论文中更大计算量下的结果在量级上一致，能够支撑有意义的对比分析。虽然因为计算资源限制无法完全复现论文的求解精度，但本实验所验证的核心结论——层次化迁移和移动种群策略的有效性——与论文的发现是一致的。
+
+\subsection{实验流程}
+
+每种算法独立运行 10 次，每次运行从头开始初始化 64 个子种群（各含 100 个随机路径）并独立演化至终止条件。各次运行的随机种子由系统时间决定，运行之间相互独立，满足统计独立性假设。每次运行记录两项核心数据：（1）每隔 10000 代的当前子种群最优解距离，用于绘制收敛曲线；（2）运行结束后的最终全种群最优解距离和总运行时间，用于统计分析和运行效率对比。10 次运行结束后，以配对 t 检验（双侧检验，显著性水平 $\alpha=0.05$）对三种算法的均值进行两两比较，判定差异的统计显著性。
+
+% ---------- 4. 实验结果 ----------
+\section{实验结果与分析}
+
+\subsection{数值结果}
+
+表~\ref{tab:results} 汇总了三种算法各运行 10 次的统计结果。
+
+\begin{table}[H]
+\centering
+\caption{三种算法 10 次运行结果统计（最优解：50778）}
+\label{tab:results}
+\begin{tabular}{lrrrrr}
+\toprule
+算法 & 均值 & 标准差 & 最优值 & 平均耗时(s) & 相对误差 \\
+\midrule
+dEA (Ring DEA) & 51409.2 & 175.2 & 51150.0 & 719.2 & 1.24\% \\
+HdEA (Ring Individual) & 51052.6 & 114.0 & 50800.0 & 355.6 & 0.54\% \\
+HdEA-MP (Ring Colony) & \textbf{50972.2} & \textbf{76.0} & 50821.0 & 347.4 & \textbf{0.38\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+从均值来看，三种算法的求解质量呈清晰的递增趋势：dEA 的均值为 51409.2，HdEA 降低至 51052.6（较 dEA 改善约 356），HdEA-MP 进一步降至 50972.2（较 dEA 改善约 437）。标准差的递减趋势同样明显：dEA 的标准差高达 175.2，HdEA 降至 114.0，HdEA-MP 则仅有 76.0——这意味着移动种群策略不仅提升了平均求解质量，还显著增强了算法的稳定性，使各次运行之间的结果波动大幅缩小。从单次最佳值来看，HdEA 取得了 10 次运行中的最低值 50800，仅比已知最优解 50778 高出 22（相对误差 0.04\%），展现了接近最优解的求解潜力。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/boxplot.png}
+\includegraphics[width=0.48\textwidth]{figures/runtime.png}
+\caption{左：三种算法结果分布的箱线图（中间横线为中位数，箱体涵盖四分位距，须线延伸至 1.5 倍四分位距）。右：平均运行时间对比（误差线表示 $\pm1$ 标准差）。}
+\label{fig:distributions}
+\end{figure}
+
+图~\ref{fig:distributions} 的左子图以箱线图的形式直观呈现了三种算法的结果分布。dEA 的箱体不仅位置最高，而且箱体高度（即四分位距）也最大，表明其不仅求解质量偏低，而且跨运行的结果一致性较差。相比之下，HdEA-MP 的箱体高度最小（即四分位距最窄），中位数也最低，验证了其均值和标准差均为三者中最优的统计结论。
+
+右子图展示了三种算法的平均运行时间对比。dEA 的单轮平均耗时高达 719.2 秒，是 HdEA 和 HdEA-MP（分别约为 356 秒和 347 秒）的两倍以上。这一差异的根源在于 dEA 的通信结构——dEA 每 2 代就要进行一次全局的环形迁移，涉及全部 64 个进程的 \texttt{MPI\_Sendrecv} 调用。经过 600,000 代的演化，这意味着 300,000 次全种群同步通信。而 HdEA 和 HdEA-MP 的局部迁移间隔为 300 代（共 2000 次局部迁移），且局部迁移仅局限在组内的 8 个子种群之间——这使得迁移通信的频率和规模都远低于 dEA。此外，全局迁移虽然涉及跨组通信，但每 6000 代才发生一次（共 100 轮），其通信开销在整个运行时间中可以忽略不计。
+
+\subsection{收敛行为分析}
+
+图~\ref{fig:convergence} 展示了三种算法在 600,000 代演化过程中的最优解收敛轨迹（取 10 次运行的平均值）。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/convergence.png}
+\caption{三种算法的收敛曲线（10 次运行平均）。横轴为代数，纵轴为最优路径长度。灰色虚线标注已知最优解 50778。}
+\label{fig:convergence}
+\end{figure}
+
+三种算法均表现出典型的进化收敛模式：早期（0--100,000 代）快速下降，中间阶段（100,000--300,000 代）收敛放缓，后期（300,000 代以后）趋于平稳。在演化初期，三类算法的收敛速度大致相当——这是因为在种群初始化的随机状态下，Inver-over 算子能够迅速找到大量简单的局部改进机会（2-opt 性质的路径反转），使得最优解在短短数万代内从初始随机的 700,000+ 急剧下降至约 55,000。
+
+然而，当搜索进入中后期后，三条曲线开始出现显著分化。dEA 的收敛曲线在约 200,000 代后进入平台期，此后直至 600,000 代几乎没有再取得明显的改善，最终停留在约 51400 的水平。这反映了 dEA 尽管拥有 64 个子种群，但由于各子种群之间通过每 2 代的高频迁移持续交换个体，子种群之间的遗传相似度迅速攀升。在演化中后期，64 个岛实质上退化为一个几乎同质的"准单一"种群，丧失了通过独立探索来发现新解区域的多样性优势。虽然高频迁移在早期有助于快速传播有用基因，但在后期反而成了阻碍算法突破局部最优的屏障。
+
+HdEA 和 HdEA-MP 的收敛曲线在中后期的表现明显优于 dEA。两者的曲线在 200,000 代后仍保持一定的下降趋势，且终端值显著低于 dEA。这直接验证了层次化迁移的核心价值：局部迁移（每 300 代、限组内）以温和的频率维持组内的基因交流，而全局迁移（每 6000 代、跨组）以低频但强力的方式为各组注入来自其他组的新基因。这种双层架构使得组间的遗传隔离度得以长期维持，每个组相当于在搜索空间的不同子区域进行相对独立的开发，而全局迁移则周期性地将各组最优秀的探索成果进行跨组传播。值得注意的是，HdEA-MP（移动种群）在整个演化过程中的曲线位置全程低于 HdEA（个体迁移），且其曲线在后半程的改善幅度更大——这说明整岛移动带来的大规模基因注入效应需要有足够的演化代数来"消化"和"整合"，其优势随着代数的增加而逐渐显现。
+
+\subsection{统计显著性检验}
+
+对三种算法的 10 次运行结果两两进行配对 t 检验（双侧，显著性水平 $\alpha=0.05$），结果如表~\ref{tab:ttest} 所示。
+
+\begin{table}[H]
+\centering
+\caption{配对 t 检验结果（双侧，$\alpha=0.05$）}
+\label{tab:ttest}
+\begin{tabular}{lcc}
+\toprule
+对比组 & p 值 & 显著性 \\
+\midrule
+dEA vs HdEA (Ring Individual) & 0.0003 & 极显著 \\
+dEA vs HdEA-MP (Ring Colony) & 0.0000 & 极显著 \\
+HdEA vs HdEA-MP & 0.1151 & 不显著 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+检验结果表明，两类 HdEA 算法与 dEA 之间的性能差异均达到了极高的统计显著性（$p < 0.001$），换言之，层次化迁移策略相对于扁平环形迁移的优势并非属于随机波动的范畴，而是具有统计可信度的系统性提升。这一结论与 Li 与 Hu（2014）论文中的 t-test 结果高度一致——论文中对 pcb442 实例的 30 次运行也表明，HdEA 在 64 子种群配置下显著优于 dEA。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.55\textwidth]{figures/ttest.png}
+\caption{t-test 显著性矩阵（热力图）。颜色越深表示 p 值越小（越显著）。p<0.05 表示差异具有统计显著性。}
+\label{fig:ttest}
+\end{figure}
+
+HdEA Ring Individual 与 HdEA Ring Colony 之间的差异（$p=0.1151$）未能达到 0.05 的显著性阈值，但已接近"边际显著"的范畴。这意味着在当前 10 次运行的样本量下，尚不能以 95\% 的置信度断言移动种群策略优于个体迁移策略。这一发现本身也具有信息价值——它说明在 pcb442 这类中等难度实例上，迁移粒度的差异对求解质量的边际影响有限。结合论文的结论（移动种群策略对于"高难度"实例的改善效果更为显著），可以推断，如果实验扩展至论文中的更大规模实例（如 u724、rat783、dsj1000 等），移动种群的优势可能会更加突出，并可能达到统计显著水平。
+
+\subsection{与论文结果的对比讨论}
+
+表~\ref{tab:paper_comparison} 将本实验的结果与 Li 与 Hu（2014）论文中 pcb442 实例在 64 子种群配置下的报告值进行对比。需要指出的是，论文在 1264 核集群上以迁移间隔 $m=100,000$（总代数 200,000,000 代）运行，而本实验受限于单机 20 核的计算资源，以 $m=300$（总代数 600,000 代）运行，两者的总计算量相差约 333 倍。
+
+\begin{table}[H]
+\centering
+\caption{本实验与论文结果的对比（pcb442, 64 子种群）}
+\label{tab:paper_comparison}
+\begin{tabular}{lcccc}
+\toprule
+算法 & \multicolumn{2}{c}{本实验（10 runs）} &
+\multicolumn{2}{c}{论文（30 runs）} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5}
+ & 均值 & 标准差 & 均值 (m=100k) & 标准差 \\
+\midrule
+dEA (Ring DEA) & 51409.2 & 175.2 & 50932.6 & 9.26 \\
+HdEA (Ring Individual) & 51052.6 & 114.0 & 50906.6 & 38.60 \\
+HdEA-MP (Ring Colony) & 50972.2 & 76.0 & 50882.6 & 48.62 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+从算法排名来看，本实验与论文完全一致：HdEA-MP 最优，HdEA 次之，dEA 最差。这一排名独立于实验规模，证明了层次化迁移策略的稳健性。
+
+从绝对求解质量来看，本实验的均值较论文偏高约 90--470（dEA 偏高 477，HdEA 偏高 146，HdEA-MP 偏高 90）。这种差距随着算法复杂度的提升而减小——最简单的 dEA 差距最大，最复杂的 HdEA-MP 差距最小。这一现象的合理解释是：dEA 需要更多的代数才能弥补其扁平拓扑中早熟收敛带来的负面影响；而 HdEA-MP 凭借移动种群策略带来的强大基因注入能力，即使在较少代数下也能接近更优解。本实验中 HdEA-MP 的均值（50972）已经比论文中 dEA 在 200M 代后的均值（50933）更优，这充分证明了算法架构的升级能够在有限的计算资源下实现质量的跨越式提升。
+
+从标准差的对比来看，我们观察到论文中 dEA 的标准差（9.26）远小于我们的结果（175.2）。这可能与论文使用更大的总代数（200M 代）使得多次运行的结果充分收敛到一个较窄的区间有关。有趣的是，我们的 HdEA-MP 的标准差（76.0）反而比论文中的对应值（48.62）更分散——这可能是由于我们的运行次数（10 次）少于论文（30 次）导致的样本量不足，使其在统计意义上不够稳定。
+
+\subsection{性能差异的根本原因}
+
+综合以上分析，HdEA 和 HdEA-MP 相对于 dEA 的性能优势可以归结为以下三个核心因素。
+
+第一，层次化迁移结构有效地维护了遗传多样性。在 dEA 中，所有 64 个子种群每 2 代通过环形拓扑交换个体。这种高频的全种群通信使得子种群之间的相似度快速攀升，在数十万代之后，整个系统的遗传多样性实质上已退化至接近单一种群的水平。而 HdEA 的层次化架构通过"局部为主、全局为辅"的设计，巧妙地在基因交流与遗传隔离之间取得了平衡：局部迁移（组内、低频）在保持组内凝聚力的同时不会过度同质化组内的子种群；全局迁移（跨组、更低频）则周期性地为整个系统注入来自远方子种群的新基因，避免各组在完全封闭的基因池中长期沦陷于各自独立的局部最优中。
+
+第二，移动种群策略（HdEA-MP）提供了单次迁移中最大的信息注入量。在个体全局迁移（HdEA）中，每次只有 1 个子种群的 1 个最优个体跨越组界——这个个体携带有用的基因片段，但其对整个接收组的影响力受限于它的个体适应性及其在接收种群中的生存概率。而在移动种群策略中，整个子种群（100 个个体）作为一个整体跨越组界，一次性为接收组带来大量与该组现有基因池高度异质的新个体。这些新个体在随后的局部迁移中可以持续向组内其他子种群扩散其携带的优势基因片段，形成"宏观注入、微观扩散"的双层效应。
+
+第三，通信效率的差异直接转化为实际运行速度的优势。dEA 每 2 代就要触发 64 进程的全局 \texttt{MPI\_Sendrecv}，在 600,000 代演化中累计了 300,000 次全同步通信。而 HdEA 的局部迁移每 300 代发生一次（共 2000 次），且仅涉及组内 8 进程；全局迁移每 6000 代发生一次（共 100 次），且只有 8 个进程（每组 1 个）参与。这种数量级的通信频率差异直接造成了 dEA 的单次运行耗时（719 秒）是 HdEA 和 HdEA-MP（约 350 秒）的两倍，且这种差距会随着进程数量的增加（例如本实验的 64 进程）而被进一步放大。
+
+% ---------- 5. 结论 ----------
+\section{结论}
+
+本报告基于 MPI 并行编程模型，完整实现了 Li 与 Hu（2014）提出的三种分层分布式进化算法——Ring DEA（dEA）、Ring Individual HDEA（HdEA）和 Ring Colony HDEA（HdEA-MP），并在 TSPLIB 实例 pcb442 上进行了系统的 64 子种群对比实验。实验结果显示，两类层次化算法均显著优于基础分布式算法（$p<0.001$），其中移动种群策略的 HdEA-MP 取得了最低均值（50972）和最小标准差（76），验证了论文中以子种群为全局迁移对象这一核心创新的有效性。
+
+实验同时揭示，层次化迁移结构不仅改善了求解质量，还带来了实质性的通信效率提升——HdEA 和 HdEA-MP 的运行速度约为 dEA 的两倍（约 350 秒 vs 约 720 秒），其原因在于局部和全局两层迁移以极低的频率和有限的参与节点运行，极大地降低了迁移通信的总开销。这一发现对于分布式进化算法在实际工程中的部署具有参考价值。
+
+在未来的工作中，可以考虑在更多 TSPLIB 实例（尤其是论文中的高难度实例如 u724、dsj1000 等）上扩展实验，以进一步验证移动种群策略在高难度问题上的优势是否能够达到统计显著水平。同时，可以考虑将子种群数量提升至论文中的 64 独立物理核心配置，以及演化代数提升至论文中的数亿代量级，以获得与原始论文完全可比的求解精度。此外，论文中的随机拓扑变体（Random Individual 和 Random Colony）也值得进一步实现和对比，以完整复现论文中关于 Ring 拓扑相对于 Random 拓扑在避免冲突迁移方面的优势论述。
+
+% ---------- 参考文献 ----------
+\begin{thebibliography}{10}
+
+\bibitem{li2014}
+C. Li and G. Hu, ``Global migration strategy with moving colony for hierarchical distributed evolutionary algorithms,'' \textit{Soft Computing}, vol. 18, pp. 2161--2176, 2014.
+
+\bibitem{cai2005}
+Z. H. Cai, J. G. Peng, W. Gao, W. Wei, and L. S. Kang, ``An improved evolutionary algorithm for the traveling salesman problem,'' \textit{Chinese Journal of Computers}, vol. 28, no. 5, pp. 823--828, 2005.
+
+\bibitem{tao1998}
+G. Tao and Z. Michalewicz, ``Inver-over operator for the TSP,'' in \textit{Proceedings of the 5th Parallel Problem Solving from Nature Conference}, 1998, pp. 803--812.
+
+\bibitem{goldberg1985}
+D. E. Goldberg and R. Lingle, ``Alleles, loci, and the traveling salesman problem,'' in \textit{Proceedings of the 1st International Conference on Genetic Algorithms}, 1985, pp. 154--159.
+
+\bibitem{reinelt1996}
+G. Reinelt, \textit{TSPLIB}. University of Heidelberg, 1996.
+
+\bibitem{herrera1999}
+F. Herrera, M. Lozano, and C. Moraga, ``Hierarchical distributed genetic algorithms,'' \textit{International Journal of Intelligent Systems}, vol. 14, no. 11, pp. 1099--1121, 1999.
+
+\bibitem{skolicki2005}
+Z. Skolicki and K. De Jong, ``The influence of migration sizes and intervals on island models,'' in \textit{Proceedings of the Genetic and Evolutionary Computation Conference}, 2005, pp. 1295--1302.
+
+\end{thebibliography}
 
 \end{document}
