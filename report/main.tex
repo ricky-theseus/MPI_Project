@@ -13,6 +13,8 @@
 \usepackage{array}
 \usepackage{caption}
 \usepackage{subcaption}
+\usepackage{abstract}
+\renewcommand{\abstractname}{\zihao{4} 摘\quad 要}
 
 \usepackage{listings}
 \usepackage{xcolor}
@@ -61,19 +63,27 @@
 
 \maketitle
 \thispagestyle{empty}
-\pagenumbering{gobble}
+
+% ---- 摘要（紧跟封面，罗马数字页码）----
+\pagenumbering{Roman}
+\setcounter{page}{1}
+\include{sections/00_abstract}
 \newpage
 
-\pagenumbering{arabic}
+% ---- 目录 ----
 \tableofcontents
 \newpage
 
-\include{sections/00_abstract}
+% ---- 正文（阿拉伯数字页码，从 1 开始）----
+\pagenumbering{arabic}
+\setcounter{page}{1}
 \include{sections/01_introduction}
 \include{sections/02_algorithm_design}
 \include{sections/03_experimental_setup}
 \include{sections/04_results}
 \include{sections/05_conclusion}
+
+% ---- 附录 ----
 \include{sections/99_appendix}
 
 \end{document}
