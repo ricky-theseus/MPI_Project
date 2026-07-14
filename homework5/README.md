@@ -35,13 +35,15 @@
 ## 编译
 
 ```bash
-MSBuild homework5.vcxproj /p:Configuration=Debug /p:Platform=x64
+cl /EHsc /I"C:\Program Files (x86)\Microsoft SDKs\MPI\Include" homework5.cpp ^
+   /Fe:homework5.exe ^
+   /link /LIBPATH:"C:\Program Files (x86)\Microsoft SDKs\MPI\Lib\x64" msmpi.lib
 ```
 
 ## 运行
 
 ```bash
-mpiexec -n 4 homework5\x64\Debug\homework5.exe
+mpiexec -n 4 homework5.exe
 ```
 
 ## 示例输出
