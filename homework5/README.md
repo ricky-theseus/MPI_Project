@@ -35,7 +35,7 @@
 ## 编译
 
 ```bash
-cl /EHsc /I"C:\Program Files (x86)\Microsoft SDKs\MPI\Include" homework5.cpp ^
+cl /EHsc /utf-8 /I"C:\Program Files (x86)\Microsoft SDKs\MPI\Include" homework5.cpp ^
    /Fe:homework5.exe ^
    /link /LIBPATH:"C:\Program Files (x86)\Microsoft SDKs\MPI\Lib\x64" msmpi.lib
 ```
