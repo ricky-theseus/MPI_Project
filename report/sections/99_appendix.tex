@@ -4,7 +4,7 @@
 本附录收录课程作业 2--6 的完整源码与设计说明。
 
 % ===== Homework 2 =====
-\subsection*{Homework 2：并行归并排序}
+\subsection{Homework 2：并行归并排序}
 
 \noindent\textbf{题目：}长度为 $m$ 的数组二分 $k$ 次，得到 $2^k$ 个子数组，每个子数组内部排序后两两归并。进程数 $n = \min(2^k, m)$，$m$ 和 $k$ 运行时输入。
 
@@ -26,7 +26,7 @@ PASS: matches std::sort
 
 \clearpage
 % ===== Homework 3 =====
-\subsection*{Homework 3：MPI 矩阵乘法}
+\subsection{Homework 3：MPI 矩阵乘法}
 
 \noindent\textbf{题目：}利用 9 个进程并行计算 $3\times3$ 矩阵乘法 $C = A \times B$，每个进程算一个元素。
 
@@ -53,7 +53,7 @@ C = A x B:
 
 \clearpage
 % ===== Homework 4 =====
-\subsection*{Homework 4：用 MPI\_Send / MPI\_Recv 实现 MPI\_Gather}
+\subsection{Homework 4：用 MPI\_Send / MPI\_Recv 实现 MPI\_Gather}
 
 \noindent\textbf{题目：}不使用 MPI\_Gather，仅用 MPI\_Send / MPI\_Recv 实现自定义 \texttt{my\_MPI\_Gather}，并与标准 MPI\_Gather 对比验证。
 
@@ -70,7 +70,7 @@ C = A x B:
 
 \clearpage
 % ===== Homework 5 =====
-\subsection*{Homework 5：用 MPI\_Send / MPI\_Recv 实现 MPI\_Allgather}
+\subsection{Homework 5：用 MPI\_Send / MPI\_Recv 实现 MPI\_Allgather}
 
 \noindent\textbf{题目：}不使用 MPI\_Allgather，仅用 MPI\_Send / MPI\_Recv 实现自定义 \texttt{my\_MPI\_Allgather}，并与标准 MPI\_Allgather 对比验证。
 
@@ -86,7 +86,7 @@ C = A x B:
 
 \clearpage
 % ===== Homework 6 =====
-\subsection*{Homework 6：思政思考——华为在高性能/并行计算领域的核心竞争力}
+\subsection{Homework 6：思政思考——华为在高性能/并行计算领域的核心竞争力}
 
 \lstset{basicstyle=\scriptsize\fontspec{DejaVu Sans Mono},language={}}
 以下为思政作业原文：
@@ -117,34 +117,3 @@ C = A x B:
 
 三者全栈打通，从芯片到并行框架全面自主可控。
 \end{lstlisting}
-
-\clearpage
-\section{附录：课程项目源码}
-
-本附录收录课程项目实验的三种并行进化算法完整 C++ 源码。三种算法均针对 TSPLIB 标准测试实例 pcb442（442 城市）设计，使用相同的进化操作框架（锦标赛选择、顺序交叉、交换变异、精英保留），仅在并行架构上有所区别。
-
-\subsection*{Algorithm 1：分布式进化算法（dEA）}
-
-\par\noindent\textbf{文件：}\texttt{TSP\_dEA.cpp}\hfill\textbf{架构：}主从式（Master-Worker），4 进程
-\par\noindent\textbf{核心思想：}Master（rank 0）维护全局 200 个个体的种群，每代广播全部个体至所有 Worker 进程进行适应度评估，评估结果通过 MPI\_Gatherv 收集回 Master 进行选择和遗传操作。
-
-\lstset{basicstyle=\scriptsize\fontspec{DejaVu Sans Mono},language=C++}
-\lstinputlisting{../course-project/01_分布式进化算法/TSP_dEA.cpp}
-
-\clearpage
-\subsection*{Algorithm 2：分层分布式进化算法（HdEA）}
-
-\par\noindent\textbf{文件：}\texttt{TSP\_HdEA.cpp}\hfill\textbf{架构：}岛屿模型 + 两层分层，4 进程
-\par\noindent\textbf{核心思想：}每个进程独立维护 50 个个体的子种群进行进化，每 20 代各进程将本岛最优的 3 个精英发送至 Master 进行二阶精英进化，进化后的全局最优通过广播分发回各岛屿。
-
-\lstset{basicstyle=\scriptsize\fontspec{DejaVu Sans Mono},language=C++}
-\lstinputlisting{../course-project/02_分层分布式进化算法/TSP_HdEA.cpp}
-
-\clearpage
-\subsection*{Algorithm 3：带种群迁移的分层分布式进化算法（HdEA-MP）}
-
-\par\noindent\textbf{文件：}\texttt{TSP\_HdEA\_MP.cpp}\hfill\textbf{架构：}岛屿模型 + 环形迁移，4 进程
-\par\noindent\textbf{核心思想：}在 HdEA 的精英协调机制之上，每 20 代额外执行一次环形迁移——每个进程将其最优的 3 个个体通过 MPI\_Sendrecv 发送至右邻居进程，并接收来自左邻居的移民，用更优的移民替换本地最差个体，以增加岛屿之间的基因交流。
-
-\lstset{basicstyle=\scriptsize\fontspec{DejaVu Sans Mono},language=C++}
-\lstinputlisting{../course-project/03_HdEA_MP/TSP_HdEA_MP.cpp}
