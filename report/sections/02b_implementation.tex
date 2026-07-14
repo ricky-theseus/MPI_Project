@@ -1,0 +1,135 @@
+\section{算法实现}
+
+\subsection{进程组织与组结构}
+
+三种算法均基于 MPI 的多进程模型，每个子种群由一个独立的 MPI 进程承载。对于 dEA 而言，所有 $n$ 个进程组成一个扁平的环形拓扑，每个进程的左右邻居通过简单的模运算确定：左邻居为 $(\text{rank} - 1 + n) \bmod n$，右邻居为 $(\text{rank} + 1) \bmod n$。
+
+对于 HdEA 和 HdEA-MP，层次化的迁移结构要求将进程进一步组织为 $M$ 个组、每组 $N$ 个子种群的二维布局。每个进程所属的组编号和组内编号由 $\text{myGroup} = \text{rank} / N$ 和 $\text{myPos} = \text{rank} \bmod N$ 计算得出。局部迁移仅在组内进行，因此每个进程的局部邻居为组内的下一位置和上一位置：$\text{localNext} = \text{myGroup} \times N + (\text{myPos} + 1) \bmod N$，$\text{localPrev} = \text{myGroup} \times N + (\text{myPos} - 1 + N) \bmod N$。在本实验中，$M = N = 8$，共使用 64 个 MPI 进程——如以下指令所示：
+
+\begin{lstlisting}
+mpiexec -n 64 TSP_HdEA.exe <tspfile> 8 8 <runs> <migInterval> <variant>
+\end{lstlisting}
+
+\subsection{dEA 的主循环与迁移}
+
+代码 \ref{lst:dea} 展示了 dEA 的代循环核心逻辑。每一代中，进程先执行基板 EA 的全部操作——Inver-over 演化（\texttt{inver\_over\_evolve}）、精英选择（\texttt{select\_elitist}），然后检查是否有停滞并视需要触发映射算子。当到达迁移时刻（每 \texttt{MIG\_INTERVAL} 代，本实验中为 2 代），进程从自身子种群中随机选择一个个体作为迁出者，通过 \texttt{MPI\_Sendrecv} 同时发送给右邻居并接收来自左邻居的个体；接收到的个体替换本地种群中最差的个体。这一单次 Sendrecv 调用通过在同一行内指定发送和接收的缓冲区与目标，避免了死锁的可能，且语义上精确表达了环形拓扑中 "推进—接收" 的对称操作模式。
+
+\begin{lstlisting}[caption={dEA 代循环核心（Inver-over + 停滞检测 + Ring 迁移）},label={lst:dea}]
+for (long gen = 0; gen < maxGen; gen++) {
+    probab1 = probab1_init *
+        (1.0 - ((double)gen / (double)maxGen) * 0.01);
+    inver_over_evolve(colony, dis, POP_SIZE, city_dis);
+    select_elitist(colony, dis, POP_SIZE);
+    // stagnation detection + mapping trigger
+    double currBest = dis[best_idx(dis, POP_SIZE)];
+    if (gen - lastImproveGen > 2000 && (rand()/32768.0) < 0.05) {
+        mapping_operator(colony, dis, POP_SIZE, city_dis);
+        lastImproveGen = gen;
+    }
+    // ring migration every MIG_INTERVAL gens
+    if (gen % MIG_INTERVAL == 0 && gen > 0) {
+        int emigrant = rand() % POP_SIZE;
+        MPI_Sendrecv(colony[emigrant], xCity, MPI_INT,
+                     neighbor, 0, tourBuffer, xCity, MPI_INT,
+                     prev, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        int worst = worst_idx(dis, POP_SIZE);
+        memcpy(colony[worst], tourBuffer, xCity * sizeof(int));
+        dis[worst] = tour_distance(colony[worst], city_dis);
+    }
+}
+\end{lstlisting}
+
+\subsection{HdEA 的局部迁移与全局迁移调度}
+
+HdEA 和 HdEA-MP 的代循环在 dEA 的基础之上增加了层次化的迁移调度逻辑，如代码 \ref{lst:hdea} 所示。局部迁移的代码与 dEA 完全相同——从本子种群随机选一个个体，通过 \texttt{MPI\_Sendrecv} 与组内的邻居交换，接收到的个体替换本地最差——但迁移的目标不再是全局环形上的邻居，而是同组内的邻居 \texttt{localNext} 和 \texttt{localPrev}。
+
+局部迁移的计数变量 \texttt{localMigCount} 在每次局部迁移后递增。当该计数达到 \texttt{LOCAL\_RATIO}（即 20）的倍数时，意味着已进行了 20 轮局部迁移——此时触发一次全局迁移。全局迁移的具体行为由 \texttt{variant} 参数在四种策略之间切换：variant = 0 对应 Ring Individual HDEA，variant = 2 对应 Ring Colony HDEA（HdEA-MP）。全局迁移之后，递增 \texttt{globalMigCount}，并检查是否已达到终止阈值 \texttt{GLOBAL\_ROUNDS}（即 100 轮）。
+
+\begin{lstlisting}[caption={HdEA 局部迁移 + 全局迁移调度},label={lst:hdea}]
+if (gen > 0 && gen % migInterval == 0) {
+    // ---- local migration (same as dEA, but within group) ----
+    int emigrant = rand() % POP_SIZE;
+    MPI_Sendrecv(colony[emigrant], xCity, MPI_INT,
+                 localNext, 0, tourBuffer, xCity, MPI_INT,
+                 localPrev, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    int worst = worst_idx(dis, POP_SIZE);
+    memcpy(colony[worst], tourBuffer, xCity * sizeof(int));
+    dis[worst] = tour_distance(colony[worst], city_dis);
+    localMigCount++;
+    // ---- global migration every 20 local rounds ----
+    if (localMigCount % LOCAL_RATIO == 0) {
+        globalMigCount++;
+        switch (variant) {
+        case 0: global_ring_individual(...); break;
+        case 1: global_random_individual(...); break;
+        case 2: global_ring_colony(...); break;      // HdEA-MP
+        case 3: global_random_colony(...); break;
+        }
+        if (globalMigCount >= GLOBAL_ROUNDS) break;
+    }
+}
+\end{lstlisting}
+
+\subsection{Ring Individual 全局迁移}
+
+代码 \ref{lst:ringindiv} 给出了 Ring Individual HDEA 的全局迁移实现。每轮全局迁移选择一个轮转子种群序号 $\text{subpopIdx} = (r-1) \bmod N$，其中 $r = \text{globalMigCount}$ 为当前全局迁移轮次。只有当本进程的组内位置 $\text{myPos}$ 等于 $\text{subpopIdx}$ 时，该进程才参与本次全局迁移，其余进程跳过。
+
+参与全局迁移的进程首先计算出源组和目标组在环形拓扑上的排名：源组为本进程所在组的前一组 $(\text{myGroup}-1+M) \bmod M$，目标组为后一组 $(\text{myGroup}+1) \bmod M$。然后，通过一次 \texttt{MPI\_Sendrecv} 同时完成发送与接收：将本地子种群的最优个体发送至目标组中同位置的子种群，同时接收来自源组同位置子种群的最优个体。接收到的个体替换本地子种群中的最差个体。
+
+\begin{lstlisting}[caption={Ring Individual 全局迁移（每轮 1 个子种群，最优迁出—最差替换）},label={lst:ringindiv}]
+void global_ring_individual(int rank, int M, int N,
+    int myGroup, int myPos, int (*colony)[CITY], double dis[],
+    int *tourBuffer, double **city_dis, long globalMigCount)
+{
+    int subpopIdx = (globalMigCount - 1) % N;
+    if (myPos == subpopIdx) {
+        int srcGroup = (myGroup - 1 + M) % M;
+        int dstGroup = (myGroup + 1) % M;
+        int srcRank = srcGroup * N + subpopIdx;
+        int dstRank = dstGroup * N + subpopIdx;
+        int best = best_idx(dis, POP_SIZE);
+        MPI_Sendrecv(colony[best], xCity, MPI_INT,
+                     dstRank, 1, tourBuffer, xCity, MPI_INT,
+                     srcRank, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        int worst = worst_idx(dis, POP_SIZE);
+        memcpy(colony[worst], tourBuffer, xCity * sizeof(int));
+        dis[worst] = tour_distance(colony[worst], city_dis);
+    }
+}
+\end{lstlisting}
+
+\subsection{Ring Colony 全局迁移（HdEA-MP）}
+
+代码 \ref{lst:ringcolony} 展示了 Ring Colony HDEA（即 HdEA-MP）的全局迁移实现——这是本文的核心创新。在确定参与的子种群序号方面，其逻辑与 Ring Individual 版本完全相同（\texttt{subpopIdx} 轮转、位置匹配检查）。两者的根本区别在于 \texttt{MPI\_Sendrecv} 传输的数据量。
+
+在 Ring Individual 版本中，\texttt{MPI\_Sendrecv} 仅传输 1 条路径（\texttt{xCity} 个整型数），即单个最优个体的编码。而在 Ring Colony 版本中，\texttt{MPI\_Sendrecv} 的发送和接收缓冲区分别指向整个子种群的起始地址，每次传输 $\text{POP\_SIZE} \times \text{xCity} \approx 44,200$ 个整型数——即该子种群的全部 100 条完整路径。接收方在接收到整岛数据后，直接以内存拷贝的方式整体替换本地子种群的全部个体，随后重新计算所有个体的路径距离。
+
+从通信量来看，单次整岛传输约为 $100 \times 442 \times 4 \approx 177\text{KB}$。由于全局迁移仅每 6000 代发生一次（局部迁移间隔 $m=300$、局部:全局比为 20）、且仅 8 个子种群（每组 1 个）参与，该数据量在实际运行中的通信开销完全可忽略。且从逻辑语义看，整岛 Sendrecv 精确对应了论文中"子种群作为整体在组间移动"的操作定义。
+
+\begin{lstlisting}[caption={Ring Colony 全局迁移——移动种群（整岛 Sendrecv）},label={lst:ringcolony}]
+void global_ring_colony(int M, int N, int rank,
+    int myGroup, int myPos, int (*colony)[CITY], double dis[],
+    double **city_dis, long globalMigCount)
+{
+    int subpopIdx = (globalMigCount - 1) % N;
+    if (myPos == subpopIdx) {
+        int srcGroup = (myGroup - 1 + M) % M;
+        int dstGroup = (myGroup + 1) % M;
+        int srcRank = srcGroup * N + subpopIdx;
+        int dstRank = dstGroup * N + subpopIdx;
+        int recv_colony[POP_SIZE][CITY];
+        MPI_Sendrecv(colony[0], POP_SIZE * xCity, MPI_INT,
+                     dstRank, 3, recv_colony[0],
+                     POP_SIZE * xCity, MPI_INT,
+                     srcRank, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        memcpy(colony[0], recv_colony[0],
+               POP_SIZE * xCity * sizeof(int));
+        for (int i = 0; i < POP_SIZE; i++)
+            dis[i] = tour_distance(colony[i], city_dis);
+    }
+}
+\end{lstlisting}
+
+\subsection{MPI 通信模式总结}
+
+三种算法使用了不同层次和频率的 MPI 原语，总结如下。dEA 每 2 代触发一次全 64 进程的 \texttt{MPI\_Sendrecv}——阻塞式的同步发送-接收操作，语义上等价于同时从两个邻居收-发，保证不会产生死锁。在 600,000 代的演化中，共执行 300,000 次全进程同步通信。HdEA 的局部迁移同样使用 \texttt{MPI\_Sendrecv}，但每 300 代才触发一次，且仅在 8 个进程（一组）之间进行（总计 2,000 次）。HdEA 的全局迁移则根据变体类型分为两种模式：Ring Individual 的全局迁移是单个体的小数据量 Sendrecv（$\sim 1.8\text{KB}/\text{次}$），而 Ring Colony 的全局迁移是整岛的大数据量 Sendrecv（$\sim 177\text{KB}/\text{次}$），两者均每 6000 代触发一次、仅 8 个进程参与（共 100 次）。此外，HdEA 在每轮运行结束时通过一次全局的 \texttt{MPI\_Reduce}（\texttt{MPI\_MIN} 操作）将各子种群的最优解汇聚至 0 号进程，用于最终统计和日志输出。
