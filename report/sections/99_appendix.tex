@@ -53,3 +53,33 @@
 
 \item 华为的独特壁垒在于软硬协同——从芯片到并行框架全部自主可控，不依赖第三方组件即可完成大规模并行计算。相比 MPI 只定义通信标准的开放模式，华为实现了从底层硬件到上层框架的垂直整合，在当前国际形势下具有重要的战略意义。
 \end{enumerate}
+
+\clearpage
+\section{附录：课程设计算法代码}
+
+以下为课程设计实现的三类分布式进化算法（dEA、HdEA）的完整 C++ 源码，
+基于 Li \& Hu (2014) 参数设置，
+使用 Inver-over 算子 + Mapping 算子求解 TSP 问题，通过 MPI 实现进程间迁移通信。
+
+\subsection{dEA Island Model（岛模型分布式进化算法）}
+
+\noindent 每个 MPI 进程作为一个独立子种群（岛），
+每 \texttt{MIG\_INTERVAL}=2 代进行一次 Ring 拓扑迁移，Random-worst 替换策略。
+终止条件：达到指定总代数。
+
+\lstinputlisting{../course-project/04_dEA_island/TSP_dEA_island.cpp}
+
+\clearpage
+\subsection{HdEA（层次化分布式进化算法，4 种变体）}
+
+\noindent 将 $M\times N$ 个进程分为 $M$ 组，每组 $N$ 个子种群。局部迁移在组内 Ring 拓扑上每 \texttt{migInterval} 代执行一次，全局迁移每 20 次局部迁移执行一次，终止于 100 轮全局迁移。
+
+变体：
+\begin{itemize}
+  \item \textbf{0 - Ring Individual}：全局迁移时，Ring 拓扑轮转转发最优个体
+  \item \textbf{1 - Random Individual}：全局迁移时，随机配对交换个体
+  \item \textbf{2 - Ring Colony}（HdEA-MP）：全局迁移时，Ring 拓扑轮转转发整个子种群
+  \item \textbf{3 - Random Colony}：全局迁移时，随机配对交换整个子种群
+\end{itemize}
+
+\lstinputlisting{../course-project/05_HdEA/TSP_HdEA.cpp}
