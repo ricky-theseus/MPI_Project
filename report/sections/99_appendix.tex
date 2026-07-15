@@ -1,119 +1,55 @@
 \clearpage
-\section{附录：Homework 源码与说明}
-
-本附录收录课程作业 2--6 的完整源码与设计说明。
-
-% ===== Homework 2 =====
-\subsection{Homework 2：并行归并排序}
-
-\noindent\textbf{题目：}长度为 $m$ 的数组二分 $k$ 次，得到 $2^k$ 个子数组，每个子数组内部排序后两两归并。进程数 $n = \min(2^k, m)$，$m$ 和 $k$ 运行时输入。
+\section{附录：作业源码与说明}
 
 \lstset{basicstyle=\scriptsize\fontspec{DejaVu Sans Mono},language=C++}
+
+% ===== 并行归并排序 =====
+\subsection{并行归并排序}
+
+\noindent 将长度为 $m$ 的数组二分 $k$ 次，得到 $2^k$ 个子数组，每个子数组内部排序后两两归并。进程数 $n = \min(2^k, m)$。
+
 \lstinputlisting{../homework2/homework2.cpp}
 
-\noindent\textbf{运行示例：}
-\lstset{basicstyle=\scriptsize\fontspec{DejaVu Sans Mono},language={}}
-\begin{lstlisting}
-mpiexec -n 4 homework2.exe
-m=8, k=2, needed processes=4, actual=4
-Rank 0 got chunk: 3 1
-Rank 0 sorted: 1 3
-Rank 0 merged from rank 1, now has: 1 1 3 4
-Rank 0 merged from rank 2, now has: 1 1 2 3 4 5 6 9
-Final sorted array: 1 1 2 3 4 5 6 9
-PASS: matches std::sort
-\end{lstlisting}
-
 \clearpage
-% ===== Homework 3 =====
-\subsection{Homework 3：MPI 矩阵乘法}
+% ===== MPI 矩阵乘法 =====
+\subsection{MPI 矩阵乘法}
 
-\noindent\textbf{题目：}利用 9 个进程并行计算 $3\times3$ 矩阵乘法 $C = A \times B$，每个进程算一个元素。
+\noindent 利用 9 个进程并行计算 $3\times3$ 矩阵乘法 $C = A \times B$，每个进程算一个元素。
 
-\lstset{basicstyle=\scriptsize\fontspec{DejaVu Sans Mono},language=C++}
 \lstinputlisting{../homework3/homework3.cpp}
 
-\noindent\textbf{运行示例：}
-\lstset{basicstyle=\scriptsize\fontspec{DejaVu Sans Mono},language={}}
-\begin{lstlisting}
-mpiexec -n 9 homework3.exe
-Matrix A:
-   1   2   3
-   4   5   6
-   7   8   9
-Matrix B:
-   9   8   7
-   6   5   4
-   3   2   1
-C = A x B:
-  30  24  18
-  84  69  54
- 138 114  90
-\end{lstlisting}
-
 \clearpage
-% ===== Homework 4 =====
-\subsection{Homework 4：用 MPI\_Send / MPI\_Recv 实现 MPI\_Gather}
+% ===== 用 MPI_Send/Recv 实现 MPI_Gather =====
+\subsection{用 MPI\_Send / MPI\_Recv 实现 MPI\_Gather}
 
-\noindent\textbf{题目：}不使用 MPI\_Gather，仅用 MPI\_Send / MPI\_Recv 实现自定义 \texttt{my\_MPI\_Gather}，并与标准 MPI\_Gather 对比验证。
+\noindent 不使用 MPI\_Gather，仅用 MPI\_Send / MPI\_Recv 实现自定义 \texttt{my\_MPI\_Gather}，并与标准 MPI\_Gather 对比验证。
 
-\lstset{basicstyle=\scriptsize\fontspec{DejaVu Sans Mono},language=C++}
+设计上遵循 HMPI 规范——root 进程通过 \texttt{memcpy} 将自己数据直接拷贝到接收缓冲区的对应位置，其余进程通过 \texttt{MPI\_Send} 将数据发送至 root，root 按 rank 顺序通过 \texttt{MPI\_Recv} 依次接收。此外，程序通过分布式打印演示了 Gather 的核心语义：将字符串 ``姓名: 任天翌~~学号: 20231003512'' 切分成 4 段分发给 4 个进程，各进程调用 \texttt{my\_MPI\_Gather} 将各自持有的段汇聚至 rank 0，rank 0 拼接后输出完整字符串，同时保留整数版本的验证测试。
+
 \lstinputlisting{../homework4/homework4.cpp}
 
-\noindent\textbf{设计思路：}
-\begin{itemize}
-  \item root 进程先将自身数据拷贝到 recvbuf 头部。
-  \item 然后按 rank 顺序接收其他进程发送的数据，写入 recvbuf 对应偏移位置。
-  \item 非 root 进程各发送一个 MPI\_INT 到 root。
-  \item 用标准 MPI\_Gather 的结果做校验。
-\end{itemize}
-
 \clearpage
-% ===== Homework 5 =====
-\subsection{Homework 5：用 MPI\_Send / MPI\_Recv 实现 MPI\_Allgather}
+% ===== 用 MPI_Send/Recv 实现 MPI_Allgather =====
+\subsection{用 MPI\_Send / MPI\_Recv 实现 MPI\_Allgather}
 
-\noindent\textbf{题目：}不使用 MPI\_Allgather，仅用 MPI\_Send / MPI\_Recv 实现自定义 \texttt{my\_MPI\_Allgather}，并与标准 MPI\_Allgather 对比验证。
+\noindent 不使用 MPI\_Allgather，仅用 MPI\_Send / MPI\_Recv 实现自定义 \texttt{my\_MPI\_Allgather}，并与标准 MPI\_Allgather 对比验证。
 
-\lstset{basicstyle=\scriptsize\fontspec{DejaVu Sans Mono},language=C++}
+采用环形轮转算法（Ring Allgather）：每个进程先将自身数据块写入接收缓冲区的对应位置（HMPI），随后进行 $size-1$ 步环形传递——每步当前进程向右邻居发送一个数据块，同时从左邻居接收一个数据块，逐步完成全交换。同样通过分布式打印演示了 Allgather 的核心语义：与 Gather 不同，所有进程最终都获得完整字符串，体现了 Allgather = Gather + Bcast 的聚合广播特性。
+
 \lstinputlisting{../homework5/homework5.cpp}
 
-\noindent\textbf{设计思路（环形轮转）：}
-\begin{enumerate}
-  \item 每个进程先将自己的数据块写入 recvbuf 对应位置（rank 索引处）。
-  \item 进行 $size-1$ 步环形传递：当前进程向 (rank+1) 发送一个数据块，同时从 (rank-1) 接收一个数据块。
-  \item 每步目标地址由 (rank - step) mod size 计算，保证 $size-1$ 步后所有数据到达所有进程。
-\end{enumerate}
-
 \clearpage
-% ===== Homework 6 =====
-\subsection{Homework 6：思政思考——华为在高性能/并行计算领域的核心竞争力}
+% ===== 思政思考 =====
+\subsection{思政思考：华为在高性能/并行计算领域的核心竞争力}
 
-\lstset{basicstyle=\scriptsize\fontspec{DejaVu Sans Mono},language={}}
-以下为思政作业原文：
+\begin{enumerate}
+\item 华为构建了"芯片—框架—编译器"全栈自研的并行计算生态。鲲鹏处理器提供 ARM 架构通用算力，昇腾 AI 处理器的达芬奇架构（DaVinci Core）内置 3D Cube 矩阵计算单元，专为大规模并行矩阵运算设计，单次可完成 $16\times16\times16$ 的乘加操作。
 
-\begin{lstlisting}
-# 思政思考：华为在高性能/并行计算领域的核心竞争力
+\item 在并行计算框架层面，MindSpore 框架内置了数据并行、模型并行、流水线并行等分布式策略，自动在集群中完成梯度 Allreduce、参数 Gather 等集合通信操作，开发者无需手动编写 MPI 通信代码即可获得高效的分布式训练能力。
 
-## 与并行计算课程的联系
+\item 在通信层，华为自研的 HCCS（华为高速互联）实现了昇腾芯片之间的低延迟高带宽通信，为大规模并行计算提供了高效的物理互联基础。
 
-华为在 HPC/并行计算领域最大的竞争力在于
-"芯片—框架—编译器"全栈自研的并行计算生态，与课程内容直接对应：
+\item 在编译优化层，毕昇编译器（Bisheng）针对鲲鹏和昇腾硬件做了深度自动向量化与循环并行化优化，将传统 MPI 编程中需手动调优的环节交由编译器自动完成。
 
-| 课程概念                  | 华为对应能力                                     |
-|--------------------------|------------------------------------------------|
-| MPI 集体通信（Gather、Allgather、Reduce 等） | MindSpore 框架内置的分布式并行策略，自动在集群中完成梯度 Allreduce、参数 Gather 等操作 |
-| 进程间通信、拓扑结构      | HCCS（华为高速互联）实现昇腾芯片间低延迟通信，类似 MPI 中 communicator 的物理层实现 |
-| 并行效率、负载均衡        | 昇腾 Ascend 的达芬奇架构（DaVinci Core）专为矩阵运算并行设计，3D Cube 单元单次可完成 16x16x16 的矩阵乘加 |
-| 编译器优化                | 毕昇编译器（Bisheng）针对鲲鹏/昇腾自动向量化、循环并行化 |
-
-## 华为独特壁垒
-
-相比 MPI 只定义"通信标准"的开放模式，华为的独特竞争力在于软硬协同：
-
-- 鲲鹏处理器提供 ARM 架构的通用算力
-- 昇腾 AI 处理器提供专用并行加速（达芬奇架构的 3D Cube）
-- MindSpore 自动并行策略编排，开发者无需手动写 MPI 通信代码
-- 毕昇编译器针对华为硬件深度优化
-
-三者全栈打通，从芯片到并行框架全面自主可控。
-\end{lstlisting}
+\item 华为的独特壁垒在于软硬协同——从芯片到并行框架全部自主可控，不依赖第三方组件即可完成大规模并行计算。相比 MPI 只定义通信标准的开放模式，华为实现了从底层硬件到上层框架的垂直整合，在当前国际形势下具有重要的战略意义。
+\end{enumerate}
